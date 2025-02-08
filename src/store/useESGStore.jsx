@@ -69,7 +69,7 @@ const useESGStore = create((set) => ({
           social: {
             employees: {
               global: {
-                total: { years: [], values: [], unit: '' }
+                total: { years: [2019, 2020, 2021, 2022, 2023], values: [1000, 1100, 1250, 1400, 1500], unit: 'employees' }
               },
               olympusCorp: {
                 total: { years: [], values: [], unit: '' },
@@ -118,7 +118,7 @@ const useESGStore = create((set) => ({
           },
           governance: {
             boardComposition: {
-              total: { years: [], values: [], unit: '' },
+              total: { years: [2019, 2020, 2021, 2022, 2023], values: [12, 14, 15, 15, 16], unit: 'members' },
               outside: { years: [], values: [], unit: '' },
               internal: { years: [], values: [], unit: '' },
               diversity: {

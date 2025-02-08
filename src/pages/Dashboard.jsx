@@ -671,6 +671,14 @@ const Dashboard = () => {
             }
           `}
         </style>
+
+        <Button 
+          type="primary"
+          onClick={() => navigate('/predictive-analysis')}
+          style={{ margin: '20px' }}
+        >
+          View Predictive Analysis
+        </Button>
       </Box>
     </Theme>
   )
