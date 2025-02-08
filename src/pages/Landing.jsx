@@ -1,8 +1,12 @@
+/* eslint-disable no-unused-vars */
 import { Container, Heading, Text, Button, Flex, Theme, Box } from '@radix-ui/themes'
+import { Modal, Input, Form } from 'antd'
+import { UserOutlined, LockOutlined, GoogleOutlined, MailOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { MoonIcon, SunIcon, UploadIcon } from '@radix-ui/react-icons'
 import { useNavigate } from 'react-router-dom'
-import ESGFileConverter from '../utils/fileConverter'
+import ESGFileConverter from '../components/fileConverter'
+import { supabase } from '../components/supabaseClient'
 
 const LandingPage = () => {
     const [file, setFile] = useState(null)
@@ -11,6 +15,9 @@ const LandingPage = () => {
     const [isProcessing, setIsProcessing] = useState(false)
     const [error, setError] = useState(null)
     const navigate = useNavigate()
+    const [isSignInOpen, setIsSignInOpen] = useState(false)
+    const [isSignUpOpen, setIsSignUpOpen] = useState(false)
+    const [form] = Form.useForm()
 
     const handleDragOver = (e) => {
         e.preventDefault()
@@ -61,14 +68,261 @@ const LandingPage = () => {
         }
     }
 
+    const handleGoogleSignIn = async () => {
+        try {
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/dashboard`
+                }
+            })
+
+            if (error) throw error
+        } catch (error) {
+            console.error('Error signing in with Google:', error)
+            setError('Failed to sign in with Google. Please try again.')
+        }
+    }
+
+    const handleEmailSignIn = async (values) => {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: values.email,
+                password: values.password,
+            })
+            if (error) throw error
+            setIsSignInOpen(false)
+            navigate('/dashboard')
+        } catch (error) {
+            console.error('Error signing in:', error)
+            setError('Failed to sign in. Please check your credentials.')
+        }
+    }
+
+    const handleEmailSignUp = async (values) => {
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: values.email,
+                password: values.password,
+            })
+            if (error) throw error
+            setIsSignUpOpen(false)
+            setError('Please check your email to verify your account.')
+        } catch (error) {
+            console.error('Error signing up:', error)
+            setError('Failed to sign up. Please try again.')
+        }
+    }
+
+    const modalStyle = {
+        header: {
+            textAlign: 'center',
+            marginBottom: '24px'
+        },
+        divider: {
+            margin: '16px 0',
+            textAlign: 'center',
+            color: '#888',
+            position: 'relative'
+        },
+        googleButton: {
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginTop: '8px',
+            backgroundColor: '#fff',
+            border: '1px solid #d9d9d9',
+            boxShadow: '0 2px 0 rgba(0, 0, 0, 0.02)'
+        },
+        switchText: {
+            textAlign: 'center',
+            marginTop: '16px'
+        },
+        link: {
+            color: 'var(--accent-9)',
+            cursor: 'pointer',
+            marginLeft: '4px'
+        }
+    }
+
+    const switchToSignUp = () => {
+        setIsSignInOpen(false)
+        form.resetFields()
+        setIsSignUpOpen(true)
+    }
+
+    const switchToSignIn = () => {
+        setIsSignUpOpen(false)
+        form.resetFields()
+        setIsSignInOpen(true)
+    }
+
     return (
         <Theme appearance={isDarkMode ? 'dark' : 'light'}>
             <Box style={{ minHeight: '100vh' }}>
-                {/* Theme Toggle Button */}
+                {/* Auth Modals */}
+                <Modal
+                    title={<Heading size="4" style={modalStyle.header}>Sign In</Heading>}
+                    open={isSignInOpen}
+                    onCancel={() => setIsSignInOpen(false)}
+                    footer={null}
+                    width={400}
+                >
+                    <Form
+                        form={form}
+                        onFinish={handleEmailSignIn}
+                        layout="vertical"
+                        size="large"
+                    >
+                        <Form.Item
+                            name="email"
+                            rules={[{ required: true, message: 'Please input your email!' }]}
+                        >
+                            <Input 
+                                prefix={<MailOutlined style={{ color: '#888' }} />}
+                                placeholder="Email"
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="password"
+                            rules={[{ required: true, message: 'Please input your password!' }]}
+                        >
+                            <Input.Password 
+                                prefix={<LockOutlined style={{ color: '#888' }} />}
+                                placeholder="Password"
+                            />
+                        </Form.Item>
+
+                        <Form.Item>
+                            <Button 
+                                type="primary"
+                                style={{ width: '100%', height: '40px' }} 
+                                onClick={() => form.submit()}
+                            >
+                                <UserOutlined /> Sign In
+                            </Button>
+                        </Form.Item>
+
+                        <div style={modalStyle.divider}>
+                            <Text size="2">OR</Text>
+                        </div>
+
+                        <Button 
+                            style={modalStyle.googleButton}
+                            onClick={handleGoogleSignIn}
+                            icon={<GoogleOutlined style={{ fontSize: '16px' }} />}
+                        >
+                            Continue with Google
+                        </Button>
+
+                        <div style={modalStyle.switchText}>
+                            <Text size="2">
+                                Don&apos;t have an account?
+                                <Text 
+                                    as="span" 
+                                    style={modalStyle.link}
+                                    onClick={switchToSignUp}
+
+                                >
+                                    Sign up
+                                </Text>
+                            </Text>
+                        </div>
+                    </Form>
+                </Modal>
+
+                <Modal
+                    title={<Heading size="4" style={modalStyle.header}>Create Account</Heading>}
+                    open={isSignUpOpen}
+                    onCancel={() => setIsSignUpOpen(false)}
+                    footer={null}
+                    width={400}
+                >
+                    <Form
+                        form={form}
+                        onFinish={handleEmailSignUp}
+                        layout="vertical"
+                        size="large"
+                    >
+                        <Form.Item
+                            name="email"
+                            rules={[
+                                { required: true, message: 'Please input your email!' },
+                                { type: 'email', message: 'Please enter a valid email!' }
+                            ]}
+                        >
+                            <Input 
+                                prefix={<MailOutlined style={{ color: '#888' }} />}
+                                placeholder="Email"
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="password"
+                            rules={[
+                                { required: true, message: 'Please input your password!' },
+                                { min: 6, message: 'Password must be at least 6 characters!' }
+                            ]}
+                        >
+                            <Input.Password 
+                                prefix={<LockOutlined style={{ color: '#888' }} />}
+                                placeholder="Password"
+                            />
+                        </Form.Item>
+
+                        <Form.Item>
+                            <Button 
+                                type="primary"
+                                style={{ width: '100%', height: '40px' }} 
+                                onClick={() => form.submit()}
+                            >
+                                <UserOutlined /> Sign Up
+                            </Button>
+                        </Form.Item>
+
+                        <div style={modalStyle.divider}>
+                            <Text size="2">OR</Text>
+                        </div>
+
+                        <Button 
+                            style={modalStyle.googleButton}
+                            onClick={handleGoogleSignIn}
+                            icon={<GoogleOutlined style={{ fontSize: '16px' }} />}
+                        >
+                            Continue with Google
+                        </Button>
+
+                        <div style={modalStyle.switchText}>
+                            <Text size="2">
+                                Already have an account?
+                                <Text 
+                                    as="span" 
+                                    style={modalStyle.link}
+                                    onClick={switchToSignIn}
+                                >
+                                    Sign in
+                                </Text>
+                            </Text>
+                        </div>
+                    </Form>
+                </Modal>
+
+                {/* Theme Toggle and Auth Buttons */}
                 <Box style={{ position: 'absolute', top: '20px', right: '20px' }}>
-                    <Button variant="soft" onClick={() => setIsDarkMode(!isDarkMode)}>
-                        {isDarkMode ? <SunIcon /> : <MoonIcon />}
-                    </Button>
+                    <Flex gap="2" align="center">
+                        <Button variant="soft" onClick={() => setIsSignInOpen(true)}>
+                            Sign In
+                        </Button>
+                        <Button variant="solid" onClick={() => setIsSignUpOpen(true)}>
+                            Sign Up
+                        </Button>
+                        <Button variant="soft" onClick={() => setIsDarkMode(!isDarkMode)}>
+                            {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                        </Button>
+                    </Flex>
                 </Box>
 
                 {/* Hero Section */}
@@ -81,7 +335,7 @@ const LandingPage = () => {
                         <Flex direction="column" gap="4" align="center">
                             <Heading size="9" align="center">ESG Dashboard</Heading>
                             <Text size="5" align="center" style={{ maxWidth: '600px' }}>
-                                Transform your ESG data into actionable insights. Upload your files and let our AI-powered platform analyze your environmental, social, and governance metrics.
+                               
                             </Text>
                         </Flex>
                     </Container>
@@ -155,13 +409,7 @@ const LandingPage = () => {
                             </Flex>
                         )}
 
-                        <Box style={{ marginTop: '20px' }}>
-                            <Text size="2" align="center" color="gray">
-                                Your file will be converted to our standardized ESG format for analysis.
-                                The data will include environmental metrics (energy, emissions, water),
-                                social metrics (employees), and governance metrics (board composition).
-                            </Text>
-                        </Box>
+                      
                     </Flex>
                 </Container>
             </Box>
