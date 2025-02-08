@@ -2,7 +2,7 @@
 import { Container, Heading, Text, Button, Flex, Theme, Box } from '@radix-ui/themes'
 import { Modal, Input, Form } from 'antd'
 import { UserOutlined, LockOutlined, GoogleOutlined, MailOutlined } from '@ant-design/icons'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MoonIcon, SunIcon, UploadIcon } from '@radix-ui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import ESGFileConverter from '../components/fileConverter'
@@ -18,6 +18,19 @@ const LandingPage = () => {
     const [isSignInOpen, setIsSignInOpen] = useState(false)
     const [isSignUpOpen, setIsSignUpOpen] = useState(false)
     const [form] = Form.useForm()
+    const [user, setUser] = useState(null)
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null)
+        })
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null)
+        })
+
+        return () => subscription.unsubscribe()
+    }, [])
 
     const handleDragOver = (e) => {
         e.preventDefault()
@@ -73,14 +86,27 @@ const LandingPage = () => {
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/dashboard`
+                    redirectTo: `${window.location.origin}/dashboard`,
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    }
                 }
             })
 
-            if (error) throw error
+            if (error) {
+                throw error
+            }
+
+            // No need to manually navigate - OAuth redirect will handle this
+            setIsSignInOpen(false)
+            setIsSignUpOpen(false)
         } catch (error) {
             console.error('Error signing in with Google:', error)
-            setError('Failed to sign in with Google. Please try again.')
+            Modal.error({
+                title: 'Google Sign In Failed',
+                content: 'Failed to sign in with Google. Please try again.'
+            })
         }
     }
 
@@ -90,8 +116,11 @@ const LandingPage = () => {
                 email: values.email,
                 password: values.password,
             })
+            
             if (error) throw error
+            
             setIsSignInOpen(false)
+            form.resetFields()
             navigate('/dashboard')
         } catch (error) {
             console.error('Error signing in:', error)
@@ -104,13 +133,34 @@ const LandingPage = () => {
             const { data, error } = await supabase.auth.signUp({
                 email: values.email,
                 password: values.password,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/dashboard`
+                }
             })
+            
             if (error) throw error
+            
             setIsSignUpOpen(false)
-            setError('Please check your email to verify your account.')
+            form.resetFields()
+            Modal.success({
+                title: 'Registration Successful',
+                content: 'Please check your email to verify your account.',
+                onOk: () => setError(null)
+            })
         } catch (error) {
             console.error('Error signing up:', error)
             setError('Failed to sign up. Please try again.')
+        }
+    }
+
+    const handleSignOut = async () => {
+        try {
+            const { error } = await supabase.auth.signOut()
+            if (error) throw error
+            setUser(null)
+        } catch (error) {
+            console.error('Error signing out:', error)
+            setError('Failed to sign out. Please try again.')
         }
     }
 
@@ -147,16 +197,26 @@ const LandingPage = () => {
         }
     }
 
-    const switchToSignUp = () => {
-        setIsSignInOpen(false)
-        form.resetFields()
-        setIsSignUpOpen(true)
+    const openSignIn = () => {
+        if (user) {
+            Modal.info({
+                title: 'Already Signed In',
+                content: 'You are already signed in to your account.',
+            });
+            return;
+        }
+        setIsSignInOpen(true);
     }
 
-    const switchToSignIn = () => {
-        setIsSignUpOpen(false)
-        form.resetFields()
-        setIsSignInOpen(true)
+    const openSignUp = () => {
+        if (user) {
+            Modal.info({
+                title: 'Already Signed In',
+                content: 'Please sign out first to create a new account.',
+            });
+            return;
+        }
+        setIsSignUpOpen(true);
     }
 
     return (
@@ -197,12 +257,8 @@ const LandingPage = () => {
                         </Form.Item>
 
                         <Form.Item>
-                            <Button 
-                                type="primary"
-                                style={{ width: '100%', height: '40px' }} 
-                                onClick={() => form.submit()}
-                            >
-                                <UserOutlined /> Sign In
+                            <Button type="primary" htmlType="submit" block>
+                                Sign In
                             </Button>
                         </Form.Item>
 
@@ -224,7 +280,7 @@ const LandingPage = () => {
                                 <Text 
                                     as="span" 
                                     style={modalStyle.link}
-                                    onClick={switchToSignUp}
+                                    onClick={openSignUp}
 
                                 >
                                     Sign up
@@ -274,12 +330,8 @@ const LandingPage = () => {
                         </Form.Item>
 
                         <Form.Item>
-                            <Button 
-                                type="primary"
-                                style={{ width: '100%', height: '40px' }} 
-                                onClick={() => form.submit()}
-                            >
-                                <UserOutlined /> Sign Up
+                            <Button type="primary" htmlType="submit" block>
+                                Sign Up
                             </Button>
                         </Form.Item>
 
@@ -301,7 +353,7 @@ const LandingPage = () => {
                                 <Text 
                                     as="span" 
                                     style={modalStyle.link}
-                                    onClick={switchToSignIn}
+                                    onClick={openSignIn}
                                 >
                                     Sign in
                                 </Text>
@@ -313,12 +365,20 @@ const LandingPage = () => {
                 {/* Theme Toggle and Auth Buttons */}
                 <Box style={{ position: 'absolute', top: '20px', right: '20px' }}>
                     <Flex gap="2" align="center">
-                        <Button variant="soft" onClick={() => setIsSignInOpen(true)}>
-                            Sign In
-                        </Button>
-                        <Button variant="solid" onClick={() => setIsSignUpOpen(true)}>
-                            Sign Up
-                        </Button>
+                        {user ? (
+                            <Button variant="soft" onClick={handleSignOut}>
+                                Sign Out
+                            </Button>
+                        ) : (
+                            <>
+                                <Button variant="soft" onClick={openSignIn}>
+                                    Sign In
+                                </Button>
+                                <Button variant="solid" onClick={openSignUp}>
+                                    Sign Up
+                                </Button>
+                            </>
+                        )}
                         <Button variant="soft" onClick={() => setIsDarkMode(!isDarkMode)}>
                             {isDarkMode ? <SunIcon /> : <MoonIcon />}
                         </Button>
