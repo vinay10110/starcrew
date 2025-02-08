@@ -348,26 +348,49 @@ const Dashboard = () => {
   return (
     <Theme appearance={isDarkMode ? "dark" : "light"}>
       <Box className="dashboard">
-        <Flex justify="between" align="center" p="4">
-          <Heading size="6">ESG Dashboard</Heading>
-          <Flex gap="4">
-            <Button variant="soft" onClick={handleNewFileUpload}>
-              <UploadIcon />
-              Upload New File
-            </Button>
-            <Button variant="soft" onClick={handleCompareClick}>
-              <BarChartIcon />
-              Compare Industry
-            </Button>
-            <Button variant="soft" onClick={() => setOpenDialog(true)}>
-              <FileTextIcon />
-              Generate Report
-            </Button>
-            <Button variant="soft" onClick={() => setIsDarkMode(!isDarkMode)}>
-              {isDarkMode ? <SunIcon /> : <MoonIcon />}
-            </Button>
+        <Box
+          style={{
+            backgroundColor: 'var(--accent-2)',
+            padding: '16px 24px',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            borderBottom: '1px solid var(--gray-6)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000,
+          }}
+        >
+          <Flex justify="between" align="center" wrap="wrap">
+            <Heading size="6" style={{ color: 'var(--accent-9)', flex: '1 1 auto' }}>
+              ESG Dashboard
+            </Heading>
+            <Flex gap="4" wrap="wrap" style={{ flex: '1 1 auto', justifyContent: 'flex-end' }}>
+              <Button variant="soft" onClick={handleNewFileUpload} style={{ display: 'flex', alignItems: 'center' }}>
+                <UploadIcon />
+                <Text style={{ marginLeft: '8px' }}>Upload New File</Text>
+              </Button>
+              <Button variant="soft" onClick={handleCompareClick} style={{ display: 'flex', alignItems: 'center' }}>
+                <BarChartIcon />
+                <Text style={{ marginLeft: '8px' }}>Compare Industry</Text>
+              </Button>
+              <Button variant="soft" onClick={() => setOpenDialog(true)} style={{ display: 'flex', alignItems: 'center' }}>
+                <FileTextIcon />
+                <Text style={{ marginLeft: '8px' }}>Generate Report</Text>
+              </Button>
+              <Button variant="soft" onClick={() => setIsDarkMode(!isDarkMode)} style={{ display: 'flex', alignItems: 'center' }}>
+                {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                <Text style={{ marginLeft: '8px' }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</Text>
+              </Button>
+              <Button 
+                type="primary"
+                onClick={() => navigate('/predictive-analysis')}
+                style={{ display: 'flex', alignItems: 'center' }}
+              >
+                <BarChartIcon />
+                <Text style={{ marginLeft: '8px' }}>Predictive Analysis</Text>
+              </Button>
+            </Flex>
           </Flex>
-        </Flex>
+        </Box>
 
         <Container size="4" style={{ padding: "40px 20px" }}>
           <div id="environmental-section">
@@ -669,16 +692,21 @@ const Dashboard = () => {
                     transform: rotate(360deg);
                 }
             }
+
+            @media (max-width: 768px) {
+              .dashboard {
+                padding: 8px;
+              }
+              .dashboard .ant-btn {
+                flex: 1 1 100%;
+                margin-bottom: 8px;
+              }
+              .dashboard .ant-btn:last-child {
+                margin-bottom: 0;
+              }
+            }
           `}
         </style>
-
-        <Button 
-          type="primary"
-          onClick={() => navigate('/predictive-analysis')}
-          style={{ margin: '20px' }}
-        >
-          View Predictive Analysis
-        </Button>
       </Box>
     </Theme>
   )

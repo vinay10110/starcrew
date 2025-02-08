@@ -48,6 +48,24 @@ const Social = ({ data }) => {
         }]
     })
 
+    const getResponsiveChartConfig = (baseConfig) => ({
+        ...baseConfig,
+        chart: {
+            ...baseConfig.chart,
+            height: window.innerWidth < 768 ? '200px' : '300px',
+        },
+        xAxis: {
+            ...baseConfig.xAxis,
+            labels: {
+                ...baseConfig.xAxis.labels,
+                rotation: window.innerWidth < 768 ? -45 : 0,
+                style: {
+                    fontSize: window.innerWidth < 768 ? '10px' : '12px',
+                },
+            },
+        },
+    });
+
     // Olympus Corp Employee Breakdown
     const getOlympusEmployeesConfig = (olympusData) => {
         if (!olympusData?.fullTime?.total) {
@@ -64,7 +82,7 @@ const Social = ({ data }) => {
             };
         }
 
-        return {
+        const baseConfig = {
             chart: {
                 type: 'column',
                 height: '300px'
@@ -107,11 +125,12 @@ const Social = ({ data }) => {
                 color: '#FFD700'
             }]
         }
+        return getResponsiveChartConfig(baseConfig);
     }
 
     // Gender Distribution Chart
     const getGenderDistributionConfig = (fullTimeData) => {
-        return {
+        const baseConfig = {
             chart: {
                 type: 'column',
                 height: '300px'
@@ -150,99 +169,106 @@ const Social = ({ data }) => {
                 color: '#FF69B4'
             }]
         }
+        return getResponsiveChartConfig(baseConfig);
     }
 
     // Foreign Employees Chart
-    const getForeignEmployeesConfig = (foreignData) => ({
-        chart: {
-            type: 'line',
-            height: '300px'
-        },
-        title: {
-            text: 'Foreign Employees Trend'
-        },
-        xAxis: {
-            categories: foreignData.total.years
-        },
-        yAxis: {
-            title: { text: foreignData.total.unit }
-        },
-        tooltip: {
-            formatter: function() {
-                return `<b>${this.x}</b><br/>
-                        Foreign Employees: ${this.y.toLocaleString()}`
-            }
-        },
-        plotOptions: {
-            line: {
-                marker: {
-                    enabled: true,
-                    symbol: 'diamond',
-                    radius: 4
+    const getForeignEmployeesConfig = (foreignData) => {
+        const baseConfig = {
+            chart: {
+                type: 'line',
+                height: '300px'
+            },
+            title: {
+                text: 'Foreign Employees Trend'
+            },
+            xAxis: {
+                categories: foreignData.total.years
+            },
+            yAxis: {
+                title: { text: foreignData.total.unit }
+            },
+            tooltip: {
+                formatter: function() {
+                    return `<b>${this.x}</b><br/>
+                            Foreign Employees: ${this.y.toLocaleString()}`
                 }
-            }
-        },
-        series: [{
-            name: 'Total Foreign Employees',
-            data: foreignData.total.values,
-            color: '#9370DB'
-        }, {
-            name: 'Men',
-            data: foreignData.byGender.men.values,
-            color: '#4169E1'
-        }, {
-            name: 'Women',
-            data: foreignData.byGender.women.values,
-            color: '#FF69B4'
-        }]
-    })
+            },
+            plotOptions: {
+                line: {
+                    marker: {
+                        enabled: true,
+                        symbol: 'diamond',
+                        radius: 4
+                    }
+                }
+            },
+            series: [{
+                name: 'Total Foreign Employees',
+                data: foreignData.total.values,
+                color: '#9370DB'
+            }, {
+                name: 'Men',
+                data: foreignData.byGender.men.values,
+                color: '#4169E1'
+            }, {
+                name: 'Women',
+                data: foreignData.byGender.women.values,
+                color: '#FF69B4'
+            }]
+        }
+        return getResponsiveChartConfig(baseConfig);
+    }
 
     // Management Ratios Chart
-    const getManagementRatiosConfig = (ratiosData) => ({
-        chart: {
-            type: 'column',
-            height: '300px'
-        },
-        title: {
-            text: 'Management Distribution'
-        },
-        xAxis: {
-            categories: ['FY2024']
-        },
-        yAxis: {
-            title: { text: ratiosData.allEmployees.unit },
-            max: 100
-        },
-        tooltip: {
-            formatter: function() {
-                return `<b>${this.series.name}</b><br/>
-                        ${this.y}%`
-            }
-        },
-        plotOptions: {
-            column: {
-                colorByPoint: true,
-                borderRadius: 5
-            }
-        },
-        series: [{
-            name: 'All Employees',
-            data: [ratiosData.allEmployees.values[4]],
-            color: '#4169E1'
-        }, {
-            name: 'Management Positions',
-            data: [ratiosData.managementPositions.values[4]],
-            color: '#32CD32'
-        }, {
-            name: 'Junior Management',
-            data: [ratiosData.juniorManagement.values[4]],
-            color: '#FFD700'
-        }, {
-            name: 'Top Management',
-            data: [ratiosData.topManagement.values[4]],
-            color: '#FF69B4'
-        }]
-    })
+    const getManagementRatiosConfig = (ratiosData) => {
+        const baseConfig = {
+            chart: {
+                type: 'column',
+                height: '300px'
+            },
+            title: {
+                text: 'Management Distribution'
+            },
+            xAxis: {
+                categories: ['FY2024']
+            },
+            yAxis: {
+                title: { text: ratiosData.allEmployees.unit },
+                max: 100
+            },
+            tooltip: {
+                formatter: function() {
+                    return `<b>${this.series.name}</b><br/>
+                            ${this.y}%`
+                }
+            },
+            plotOptions: {
+                column: {
+                    colorByPoint: true,
+                    borderRadius: 5
+                }
+            },
+            series: [{
+                name: 'All Employees',
+                data: [ratiosData.allEmployees.values[4]],
+                color: '#4169E1'
+            }, {
+                name: 'Management Positions',
+                data: [ratiosData.managementPositions.values[4]],
+                color: '#32CD32'
+            }, {
+                name: 'Junior Management',
+                data: [ratiosData.juniorManagement.values[4]],
+                color: '#FFD700'
+            }, {
+                name: 'Top Management',
+                data: [ratiosData.topManagement.values[4]],
+                color: '#FF69B4'
+            }]
+        }
+        return getResponsiveChartConfig(baseConfig);
+    }
 
     // Score Display Chart Configuration
     const getScoreDisplayConfig = (score, grade, level) => ({

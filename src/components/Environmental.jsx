@@ -139,6 +139,24 @@ const Environmental = ({ data }) => {
         }
     }
 
+    const getResponsiveChartConfig = (baseConfig) => ({
+        ...baseConfig,
+        chart: {
+            ...baseConfig.chart,
+            height: window.innerWidth < 768 ? '200px' : '300px',
+        },
+        xAxis: {
+            ...baseConfig.xAxis,
+            labels: {
+                ...baseConfig.xAxis.labels,
+                rotation: window.innerWidth < 768 ? -45 : 0,
+                style: {
+                    fontSize: window.innerWidth < 768 ? '10px' : '12px',
+                },
+            },
+        },
+    });
+
     // Renewable Energy Chart
     const getRenewableEnergyConfig = (renewableEnergy) => {
         const categories = Object.keys(renewableEnergy)
@@ -147,7 +165,7 @@ const Environmental = ({ data }) => {
             data: renewableEnergy[category].values
         }))
 
-        return {
+        const baseConfig = {
             chart: {
                 type: 'area',
                 height: '300px'
@@ -186,49 +204,53 @@ const Environmental = ({ data }) => {
             },
             series: series
         }
+        return getResponsiveChartConfig(baseConfig);
     }
 
     // Emissions Charts Configuration
-    const getEmissionsTotalConfig = (emissionsTotal) => ({
-        chart: {
-            type: 'area',
-            height: '300px'
-        },
-        title: {
-            text: 'Total Emissions'
-        },
-        xAxis: {
-            categories: emissionsTotal.years
-        },
-        yAxis: {
+    const getEmissionsTotalConfig = (emissionsTotal) => {
+        const baseConfig = {
+            chart: {
+                type: 'area',
+                height: '300px'
+            },
             title: {
-                text: emissionsTotal.unit
-            }
-        },
-        tooltip: {
-            formatter: function() {
-                return `<b>${this.x}</b><br/>
-                        Emissions: ${this.y.toLocaleString()} ${emissionsTotal.unit}`
-            }
-        },
-        plotOptions: {
-            area: {
-                fillOpacity: 0.5,
-                marker: {
-                    enabled: true,
-                    radius: 4
+                text: 'Total Emissions'
+            },
+            xAxis: {
+                categories: emissionsTotal.years
+            },
+            yAxis: {
+                title: {
+                    text: emissionsTotal.unit
                 }
-            }
-        },
-        series: [{
-            name: 'Total Emissions',
-            data: emissionsTotal.values,
-            color: '#8B0000'
-        }]
-    })
+            },
+            tooltip: {
+                formatter: function() {
+                    return `<b>${this.x}</b><br/>
+                            Emissions: ${this.y.toLocaleString()} ${emissionsTotal.unit}`
+                }
+            },
+            plotOptions: {
+                area: {
+                    fillOpacity: 0.5,
+                    marker: {
+                        enabled: true,
+                        radius: 4
+                    }
+                }
+            },
+            series: [{
+                name: 'Total Emissions',
+                data: emissionsTotal.values,
+                color: '#8B0000'
+            }]
+        }
+        return getResponsiveChartConfig(baseConfig);
+    }
 
     const getScopeBreakdownConfig = (scope1, scope2, scope3) => {
-        return {
+        const baseConfig = {
             chart: {
                 type: 'column',
                 height: '300px'
@@ -277,11 +299,12 @@ const Environmental = ({ data }) => {
                 color: '#FFD700'
             }]
         }
+        return getResponsiveChartConfig(baseConfig);
     }
 
     // Resources Charts Configuration
     const getWaterConsumptionConfig = (waterData) => {
-        return {
+        const baseConfig = {
             chart: {
                 type: 'column',
                 height: '300px'
@@ -324,6 +347,7 @@ const Environmental = ({ data }) => {
                 color: '#20B2AA'
             }]
         }
+        return getResponsiveChartConfig(baseConfig);
     }
 
     const getWasteConfig = (wasteData) => ({

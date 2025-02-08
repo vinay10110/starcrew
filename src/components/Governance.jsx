@@ -71,6 +71,24 @@ const Governance = ({ data }) => {
         }]
     });
 
+    const getResponsiveChartConfig = (baseConfig) => ({
+        ...baseConfig,
+        chart: {
+            ...baseConfig.chart,
+            height: window.innerWidth < 768 ? '200px' : '300px',
+        },
+        xAxis: {
+            ...baseConfig.xAxis,
+            labels: {
+                ...baseConfig.xAxis.labels,
+                rotation: window.innerWidth < 768 ? -45 : 0,
+                style: {
+                    fontSize: window.innerWidth < 768 ? '10px' : '12px',
+                },
+            },
+        },
+    });
+
     // Board Composition Chart (Stacked Column)
     const getBoardCompositionConfig = (boardData) => ({
         chart: {
