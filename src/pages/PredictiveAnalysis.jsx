@@ -1,10 +1,118 @@
-import { useEffect, useState } from 'react';
+/* eslint-disable no-unused-vars */
+import { useState, useEffect } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import { Card, Button, Select, Spin, Alert } from 'antd';
 import useESGStore from '../store/useESGStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import styled from '@emotion/styled';
+
+const PageContainer = styled.div`
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+`;
+
+const StyledCard = styled(Card)`
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  background: var(--gray-1);
+
+  .ant-card-head {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--gray-5);
+    
+    .ant-card-head-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--gray-12);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .ant-card-head-title {
+      font-size: 1.1rem;
+    }
+  }
+`;
+
+const BackButton = styled(Button)`
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateX(-4px);
+  }
+`;
+
+const ControlsContainer = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
+const StyledSelect = styled(Select)`
+  min-width: 200px;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const PredictButton = styled(Button)`
+  background: linear-gradient(to right, var(--accent-9), var(--accent-10));
+  border: none;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const ChartContainer = styled.div`
+  margin-top: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--gray-2);
+  padding: 16px;
+  
+  @media (max-width: 768px) {
+    padding: 12px;
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  margin: 40px 0;
+`;
 
 const PredictiveAnalysis = () => {
     const [loading, setLoading] = useState(false);
@@ -13,7 +121,19 @@ const PredictiveAnalysis = () => {
     const [selectedMetric, setSelectedMetric] = useState('environmental');
     const [selectedSubMetric, setSelectedSubMetric] = useState('energy.total');
     const esgData = useESGStore((state) => state.esgData);
+    const setESGData = useESGStore((state) => state.setESGData);
+    const user = useESGStore((state) => state.user);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    useEffect(() => {
+        if (location.state?.data) {
+            setESGData(location.state.data);
+        }
+        else if (!esgData) {
+            navigate('/', { replace: true });
+        }
+    }, [location.state, esgData, setESGData, navigate]);
 
     const getMetricOptions = () => [
         { 
@@ -110,29 +230,129 @@ const PredictiveAnalysis = () => {
         if (!predictions) return {};
 
         return {
-            title: { text: 'ESG Predictive Analysis' },
-            xAxis: { categories: [...predictions.historical.map(d => d.year), ...predictions.predicted.map(d => d.year)] },
-            yAxis: { title: { text: 'Value' } },
+            chart: {
+                type: 'line',
+                style: {
+                    fontFamily: 'inherit'
+                },
+                backgroundColor: 'transparent'
+            },
+            title: { 
+                text: 'ESG Predictive Analysis',
+                style: {
+                    fontSize: '16px',
+                    fontWeight: '600'
+                }
+            },
+            xAxis: {
+                categories: [...predictions.historical.map(d => d.year), ...predictions.predicted.map(d => d.year)],
+                labels: {
+                    style: {
+                        color: 'var(--gray-11)'
+                    }
+                }
+            },
+            yAxis: {
+                title: {
+                    text: 'Value',
+                    style: {
+                        color: 'var(--gray-11)'
+                    }
+                },
+                gridLineColor: 'var(--gray-4)'
+            },
             series: [
-                { name: 'Historical', data: predictions.historical.map(d => d.value), color: 'blue' },
-                { name: 'Prediction', data: [...Array(predictions.historical.length).fill(null), ...predictions.predicted.map(d => d.value)], color: 'red', dashStyle: 'dash' }
-            ]
+                {
+                    name: 'Historical',
+                    data: predictions.historical.map(d => d.value),
+                    color: 'var(--accent-9)',
+                    marker: {
+                        symbol: 'circle'
+                    }
+                },
+                {
+                    name: 'Prediction',
+                    data: [...Array(predictions.historical.length).fill(null), ...predictions.predicted.map(d => d.value)],
+                    color: 'var(--accent-11)',
+                    dashStyle: 'dash',
+                    marker: {
+                        symbol: 'diamond'
+                    }
+                }
+            ],
+            responsive: {
+                rules: [{
+                    condition: {
+                        maxWidth: 500
+                    },
+                    chartOptions: {
+                        legend: {
+                            align: 'center',
+                            verticalAlign: 'bottom',
+                            layout: 'horizontal'
+                        }
+                    }
+                }]
+            }
         };
     };
 
+    const handleBack = () => {
+        navigate('/dashboard', { 
+            state: { data: esgData },
+            replace: true 
+        });
+    };
+
     return (
-        <div style={{ padding: '20px' }}>
-            <Button onClick={() => navigate('/dashboard')} style={{ marginBottom: '20px' }}>Back</Button>
-            <Card title='ESG Predictive Analysis'>
-                <Select style={{ width: 200 }} value={selectedMetric} onChange={value => setSelectedMetric(value)} options={getMetricOptions()} />
-                <Select style={{ width: 300, marginLeft: '10px' }} value={selectedSubMetric} onChange={value => setSelectedSubMetric(value)}
-                    options={getMetricOptions().find(m => m.value === selectedMetric).subMetrics} />
-                <Button type='primary' onClick={makePrediction} loading={loading} style={{ marginLeft: '10px' }}>Predict</Button>
-                {loading && <Spin style={{ marginTop: 20 }} />}
-                {error && <Alert message='Error' description={error} type='error' style={{ marginTop: 20 }} showIcon />}
-                {predictions && <HighchartsReact highcharts={Highcharts} options={getChartOptions()} />}
-            </Card>
-        </div>
+        <PageContainer>
+            <BackButton onClick={handleBack}>
+                <ArrowLeftOutlined /> Back to Dashboard
+            </BackButton>
+            
+            <StyledCard title='ESG Predictive Analysis'>
+                <ControlsContainer>
+                    <StyledSelect 
+                        value={selectedMetric} 
+                        onChange={value => setSelectedMetric(value)} 
+                        options={getMetricOptions()} 
+                    />
+                    <StyledSelect 
+                        value={selectedSubMetric} 
+                        onChange={value => setSelectedSubMetric(value)}
+                        options={getMetricOptions().find(m => m.value === selectedMetric).subMetrics} 
+                    />
+                    <PredictButton onClick={makePrediction} loading={loading}>
+                        Predict
+                    </PredictButton>
+                </ControlsContainer>
+
+                {loading && (
+                    <LoadingContainer>
+                        <Spin size="large" />
+                    </LoadingContainer>
+                )}
+
+                {error && (
+                    <Alert 
+                        message="Error" 
+                        description={error} 
+                        type="error" 
+                        showIcon 
+                        style={{ marginTop: 20 }} 
+                    />
+                )}
+
+                {predictions && (
+                    <ChartContainer>
+                        <HighchartsReact 
+                            highcharts={Highcharts} 
+                            options={getChartOptions()} 
+                        />
+                    </ChartContainer>
+                )}
+            </StyledCard>
+        </PageContainer>
     );
 };
 

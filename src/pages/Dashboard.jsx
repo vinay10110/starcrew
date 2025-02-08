@@ -63,7 +63,7 @@ const Dashboard = () => {
     }
   }
 
-  // If no data is present, redirect to home
+
   if (!data) {
     return <Navigate to="/" replace />
   }
@@ -398,6 +398,13 @@ const Dashboard = () => {
     }
   };
 
+  const handlePredictiveAnalysisClick = () => {
+    navigate('/predictive-analysis', { 
+      state: { data: esgData }, // Pass the current data
+      replace: false // Don't replace the history entry
+    });
+  };
+
   return (
     <Theme appearance={isDarkMode ? "dark" : "light"}>
       <Box className="dashboard">
@@ -435,7 +442,7 @@ const Dashboard = () => {
               </Button>
               <Button 
                 type="primary"
-                onClick={() => navigate('/predictive-analysis')}
+                onClick={handlePredictiveAnalysisClick}
                 style={{ display: 'flex', alignItems: 'center' }}
               >
                 <BarChartIcon />
