@@ -12,7 +12,7 @@ import {
   ChevronRightIcon,
   Cross2Icon,
 } from "@radix-ui/react-icons"
-import { Modal, Input, Form, Select } from 'antd'
+import { Modal, Input, Form, Select, message } from 'antd'
 import Environmental from "../components/Environmental.jsx"
 import Social from "../components/Social.jsx"
 import Governance from "../components/Governance.jsx"
@@ -20,6 +20,8 @@ import industriesData from "../assets/csvjson.json"
 import useESGStore from "../store/useESGStore"
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
+import emailjs from 'emailjs-com'
+import Highcharts from 'highcharts'
 
 import { Document, Packer, Paragraph, ImageRun, HeadingLevel, AlignmentType, PageBreak } from 'docx'
 import { saveAs } from 'file-saver'
@@ -67,14 +69,11 @@ const Dashboard = () => {
   }
 
   const handleNewFileUpload = () => {
-    // Implement file upload logic here
-    console.log("Uploading new file...")
+    navigate('/');
   }
 
   const handleCompareClick = () => {
-    console.log('Compare button clicked')
-    console.log('Current data:', data)
-    console.log('Industries data:', industriesData)
+
     
     const userScores = {
       total: data.scores.total_score,
@@ -195,154 +194,208 @@ const Dashboard = () => {
     }
   };
 
-  const generatePDF = async (chartContainers) => {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const titles = ['Environmental Performance', 'Social Performance', 'Governance Performance'];
-    const sections = ['environmental', 'social', 'governance'];
-
-    // Add title page
-    pdf.setFontSize(24);
-    pdf.text('ESG Performance Report', 105, 30, { align: 'center' });
-    pdf.setFontSize(12);
-    pdf.text(new Date().toLocaleDateString(), 105, 40, { align: 'center' });
-    pdf.addPage();
-
-    // Add each section
-    for (let i = 0; i < sections.length; i++) {
-        const container = chartContainers[sections[i]];
-        
-        // Add section title
-        pdf.setFontSize(16);
-        pdf.text(titles[i], 20, 20);
-        
-        try {
-            // Create a clone of the container to avoid style interference
-            const clone = container.cloneNode(true);
-            document.body.appendChild(clone);
-            clone.style.position = 'absolute';
-            clone.style.left = '-9999px';
-            clone.style.top = '-9999px';
-            
-            const canvas = await html2canvas(clone, {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: true,
-                width: container.offsetWidth,
-                height: container.offsetHeight
+  const captureCharts = async () => {
+    const charts = [];
+    
+    // Get all Highcharts instances
+    if (Highcharts.charts) {
+      Highcharts.charts.forEach(chart => {
+        if (chart) {
+          try {
+            // Export chart as PNG with optimized settings
+            const imageData = chart.toDataURL({
+              format: 'png',
+              width: 800,
+              scale: 1
             });
-
-            document.body.removeChild(clone);
-
-            const imgData = canvas.toDataURL('image/png');
-            const imgWidth = pdf.internal.pageSize.getWidth() - 40; // 20mm margins
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            pdf.addImage(imgData, 'PNG', 20, 30, imgWidth, imgHeight);
-
-            if (i < sections.length - 1) {
-                pdf.addPage();
-            }
-        } catch (error) {
-            console.error(`Error capturing section ${sections[i]}:`, error);
+            
+            charts.push({
+              title: chart.title ? chart.title.textStr : 'Chart',
+              imageData: imageData
+            });
+          } catch (error) {
+            console.error('Error capturing chart:', error);
+          }
         }
+      });
     }
-
-    return pdf.output('blob');
+    
+    return charts;
   };
 
-  const generateWord = async (chartContainers) => {
-    const doc = new Document({
-        sections: [{
-            properties: {},
-            children: [
-                new Paragraph({
-                    text: "ESG Performance Report",
-                    heading: HeadingLevel.TITLE,
-                    spacing: { before: 300, after: 300 },
-                    alignment: AlignmentType.CENTER
-                }),
-                new Paragraph({
-                    text: new Date().toLocaleDateString(),
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 800 }
-                }),
-                new Paragraph({
-                    children: [new PageBreak()]
-                })
-            ]
-        }]
-    });
+  const generatePDF = async () => {
+    try {
+      const pdf = new jsPDF('p', 'pt', 'a4');
+      const charts = await captureCharts();
+      
+      if (charts.length === 0) {
+        throw new Error('No charts found to generate report');
+      }
 
-    const titles = ['Environmental Performance', 'Social Performance', 'Governance Performance'];
-    const sections = ['environmental', 'social', 'governance'];
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 40;
+      let yOffset = margin;
 
-    for (let i = 0; i < sections.length; i++) {
-        const container = chartContainers[sections[i]];
+      // Add title
+      pdf.setFontSize(20);
+      pdf.text('ESG Report', pageWidth / 2, yOffset, { align: 'center' });
+      yOffset += 40;
+
+      // Add date
+      pdf.setFontSize(12);
+      pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yOffset);
+      yOffset += 30;
+
+      // Add each chart
+      for (const chart of charts) {
+        // Check if we need a new page
+        if (yOffset + 300 > pageHeight) {
+          pdf.addPage();
+          yOffset = margin;
+        }
+
+        // Add chart title
+        pdf.setFontSize(14);
+        pdf.text(chart.title, margin, yOffset);
+        yOffset += 20;
+
+        // Add chart image
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (imgWidth * 0.6);
         
         try {
-            // Create a clone of the container to avoid style interference
-            const clone = container.cloneNode(true);
-            document.body.appendChild(clone);
-            clone.style.position = 'absolute';
-            clone.style.left = '-9999px';
-            clone.style.top = '-9999px';
-
-            const canvas = await html2canvas(clone, {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: true,
-                width: container.offsetWidth,
-                height: container.offsetHeight
-            });
-
-            document.body.removeChild(clone);
-
-            const imgData = canvas.toDataURL('image/png');
-            const base64Data = imgData.split(',')[1];
-            const binaryData = atob(base64Data);
-            const byteArray = new Uint8Array(binaryData.length);
-            
-            for (let j = 0; j < binaryData.length; j++) {
-                byteArray[j] = binaryData.charCodeAt(j);
-            }
-
-            doc.addSection({
-                properties: {},
-                children: [
-                    new Paragraph({
-                        text: titles[i],
-                        heading: HeadingLevel.HEADING_1,
-                        spacing: { before: 200, after: 200 }
-                    }),
-                    new Paragraph({
-                        children: [
-                            new ImageRun({
-                                data: byteArray,
-                                transformation: {
-                                    width: 550,
-                                    height: 300
-                                }
-                            })
-                        ],
-                        spacing: { after: 200 }
-                    }),
-                    ...(i < sections.length - 1 ? [
-                        new Paragraph({
-                            children: [new PageBreak()]
-                        })
-                    ] : [])
-                ]
-            });
+          pdf.addImage(chart.imageData, 'PNG', margin, yOffset, imgWidth, imgHeight);
+          yOffset += imgHeight + 30;
         } catch (error) {
-            console.error(`Error capturing section ${sections[i]}:`, error);
+          console.error('Error adding image to PDF:', error);
         }
+      }
+
+      return pdf.output('blob');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      throw error;
+    }
+  };
+
+  const generateWord = async () => {
+    try {
+      const charts = await captureCharts();
+      
+      if (charts.length === 0) {
+        throw new Error('No charts found to generate report');
+      }
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              text: "ESG Report",
+              heading: HeadingLevel.TITLE,
+              spacing: { before: 300, after: 300 },
+              alignment: AlignmentType.CENTER
+            }),
+            new Paragraph({
+              text: new Date().toLocaleDateString(),
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 800 }
+            })
+          ]
+        }]
+      });
+
+      // Add each chart
+      for (const chart of charts) {
+        try {
+          const binaryString = window.atob(chart.imageData.split(',')[1]);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+
+          doc.addSection({
+            properties: {},
+            children: [
+              new Paragraph({
+                text: chart.title,
+                heading: HeadingLevel.HEADING_1,
+                spacing: { before: 200, after: 200 }
+              }),
+              new Paragraph({
+                children: [
+                  new ImageRun({
+                    data: bytes,
+                    transformation: {
+                      width: 500,
+                      height: 300
+                    }
+                  })
+                ],
+                spacing: { after: 200 }
+              })
+            ]
+          });
+        } catch (error) {
+          console.error('Error adding chart to Word document:', error);
+        }
+      }
+
+      return await Packer.toBlob(doc);
+    } catch (error) {
+      console.error('Error generating Word document:', error);
+      throw error;
+    }
+  };
+
+  const handleSendReport = async () => {
+    if (!emailAddress) {
+      message.error("Please enter an email address.");
+      return;
     }
 
-    return await Packer.toBlob(doc);
+    try {
+      setIsLoading(true);
+      const file = exportFormat === 'pdf' ? await generatePDF() : await generateWord();
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = async () => {
+        const base64data = reader.result.split(',')[1];
+
+        try {
+          const templateParams = {
+            to_email: emailAddress,
+            message: `ESG Report generated on ${new Date().toLocaleDateString()}`,
+            attachment: base64data,
+            filename: `ESG_Report.${exportFormat}`
+          };
+
+          await emailjs.send(
+            'your_service_id',
+            'your_template_id',
+            templateParams,
+            'your_user_id'
+          );
+
+          message.success("Email sent successfully!");
+          setOpenDialog(false);
+        } catch (emailError) {
+          console.error('Error sending email:', emailError);
+          message.error(
+            emailError.status === 413 
+              ? "File is too large to send via email. Please use the download option." 
+              : "Failed to send email. Please try downloading instead."
+          );
+        }
+      };
+    } catch (error) {
+      console.error("Failed to generate report:", error);
+      message.error("Failed to generate report. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -581,6 +634,33 @@ const Dashboard = () => {
                 Cancel
               </Button>
               <Button
+                key="send"
+                onClick={handleSendReport}
+                disabled={isLoading}
+                style={{
+                  backgroundColor: isLoading ? '#4b5563' : '#2563eb',
+                  color: '#ffffff',
+                  padding: '0 20px',
+                  height: '36px',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isLoading ? (
+                    <>
+                        <span className="loading-spinner"></span>
+                        Processing...
+                    </>
+                ) : (
+                    'Send Report'
+                )}
+              </Button>
+              <Button
                 key="download"
                 onClick={handleDirectDownload}
                 disabled={isLoading}
@@ -659,6 +739,7 @@ const Dashboard = () => {
                   Email Address
                 </Text>
               }
+              extra="Note: For large reports, please use the download option."
               style={{ marginBottom: 24 }}
             >
               <Input
@@ -673,6 +754,12 @@ const Dashboard = () => {
               />
             </Form.Item>
           </Form>
+
+          <div style={{ marginTop: '16px', color: 'var(--gray-11)' }}>
+            <Text size="2">
+              * Email delivery is limited to files under 5MB. For larger reports, please use the download option.
+            </Text>
+          </div>
         </Modal>
 
         {/* Regular style tag instead of jsx */}

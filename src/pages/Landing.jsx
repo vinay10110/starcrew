@@ -1,12 +1,235 @@
 /* eslint-disable no-unused-vars */
 import { Container, Heading, Text, Button, Flex, Theme, Box } from '@radix-ui/themes'
-import { Modal, Input, Form } from 'antd'
+import { Modal, Input, Form, Select, message } from 'antd'
 import { UserOutlined, LockOutlined, GoogleOutlined, MailOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { MoonIcon, SunIcon, UploadIcon } from '@radix-ui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import ESGFileConverter from '../components/fileConverter'
 import { supabase } from '../components/supabaseClient'
+import { motion } from 'framer-motion'
+import styled from '@emotion/styled'
+
+// Styled components for the modals
+const StyledModal = styled(Modal)`
+  .ant-modal-content {
+    border-radius: 12px;
+    padding: 32px;
+    background: var(--gray-1);
+    
+    @media (max-width: 480px) {
+      padding: 24px;
+      margin: 10px;
+    }
+  }
+
+  .ant-modal-close {
+    top: 24px;
+    right: 24px;
+  }
+
+  .ant-input-affix-wrapper {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--gray-6);
+    background: var(--gray-2);
+    transition: all 0.2s ease;
+
+    &:hover, &:focus {
+      border-color: var(--accent-8);
+    }
+  }
+
+  .ant-btn {
+    height: 44px;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .ant-btn-primary {
+    background: var(--accent-9);
+    border: none;
+
+    &:hover {
+      background: var(--accent-10);
+    }
+  }
+
+  .ant-form-item-label > label {
+    font-weight: 500;
+  }
+
+  .ant-input-prefix {
+    margin-right: 12px;
+    color: var(--gray-9);
+  }
+
+  @media (max-width: 480px) {
+    .ant-form-item {
+      margin-bottom: 16px;
+    }
+
+    .ant-input-affix-wrapper {
+      padding: 8px 12px;
+    }
+  }
+`;
+
+const GoogleButton = styled(Button)`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--gray-2);
+  border: 1px solid var(--gray-6);
+  color: var(--gray-12);
+  height: 44px;
+  border-radius: 8px;
+  margin-top: 8px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: var(--gray-3);
+    border-color: var(--gray-7);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .anticon {
+    font-size: 18px;
+    color: var(--gray-11);
+  }
+`;
+
+const Divider = styled.div`
+  margin: 24px 0;
+  text-align: center;
+  position: relative;
+  
+  &::before, &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 45%;
+    height: 1px;
+    background: var(--gray-6);
+  }
+
+  &::before {
+    left: 0;
+  }
+
+  &::after {
+    right: 0;
+  }
+`;
+
+const SwitchText = styled.div`
+  text-align: center;
+  margin-top: 24px;
+`;
+
+const LinkText = styled(Text)`
+  color: var(--accent-9);
+  cursor: pointer;
+  margin-left: 4px;
+  font-weight: 500;
+
+  &:hover {
+    color: var(--accent-10);
+  }
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  @media (max-width: 480px) {
+    flex-direction: column;
+    width: 100%;
+  }
+`;
+
+const AuthButton = styled(Button)`
+  min-width: 120px;
+  height: 40px;
+  transition: all 0.3s ease;
+  background: ${props => props.variant === 'solid' ? 
+    'linear-gradient(to right, var(--accent-9), var(--accent-10))' : 
+    'var(--gray-3)'};
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  font-weight: 500;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: ${props => props.variant === 'solid' ? 
+      'linear-gradient(to right, var(--accent-10), var(--accent-11))' : 
+      'var(--gray-4)'};
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  @media (max-width: 480px) {
+    width: 100%;
+    min-width: unset;
+  }
+`;
+
+const ThemeToggle = styled(Button)`
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-3);
+  border: none;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: var(--gray-4);
+  }
+
+  @media (max-width: 480px) {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+  }
+`;
+
+const HeaderButtons = styled.div`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    position: relative;
+    top: 0;
+    right: 0;
+    justify-content: center;
+    padding: 16px;
+  }
+`;
 
 const LandingPage = () => {
     const [file, setFile] = useState(null)
@@ -44,17 +267,33 @@ const LandingPage = () => {
 
     const handleDrop = (e) => {
         e.preventDefault()
+        if (!user) {
+            message.warning("Please sign in to upload files")
+            setIsSignInOpen(true)
+            return
+        }
         setIsDragging(false)
         const droppedFile = e.dataTransfer.files[0]
         setFile(droppedFile)
     }
 
     const handleFileSelect = (e) => {
+        if (!user) {
+            message.warning("Please sign in to upload files")
+            setIsSignInOpen(true)
+            return
+        }
         const selectedFile = e.target.files[0]
         setFile(selectedFile)
     }
 
     const handleAnalyzeReport = async () => {
+        if (!user) {
+            message.warning("Please sign in to analyze reports")
+            setIsSignInOpen(true)
+            return
+        }
+
         if (!file) return
 
         setIsProcessing(true)
@@ -94,19 +333,14 @@ const LandingPage = () => {
                 }
             })
 
-            if (error) {
-                throw error
-            }
+            if (error) throw error
 
             // No need to manually navigate - OAuth redirect will handle this
             setIsSignInOpen(false)
             setIsSignUpOpen(false)
         } catch (error) {
             console.error('Error signing in with Google:', error)
-            Modal.error({
-                title: 'Google Sign In Failed',
-                content: 'Failed to sign in with Google. Please try again.'
-            })
+            message.error('Failed to sign in with Google. Please try again.')
         }
     }
 
@@ -121,10 +355,11 @@ const LandingPage = () => {
             
             setIsSignInOpen(false)
             form.resetFields()
+            message.success('Successfully signed in!')
             navigate('/dashboard')
         } catch (error) {
             console.error('Error signing in:', error)
-            setError('Failed to sign in. Please check your credentials.')
+            message.error('Invalid email or password')
         }
     }
 
@@ -149,7 +384,7 @@ const LandingPage = () => {
             })
         } catch (error) {
             console.error('Error signing up:', error)
-            setError('Failed to sign up. Please try again.')
+            message.error(error.message || 'Failed to sign up. Please try again.')
         }
     }
 
@@ -158,42 +393,10 @@ const LandingPage = () => {
             const { error } = await supabase.auth.signOut()
             if (error) throw error
             setUser(null)
+            message.success('Successfully signed out!')
         } catch (error) {
             console.error('Error signing out:', error)
-            setError('Failed to sign out. Please try again.')
-        }
-    }
-
-    const modalStyle = {
-        header: {
-            textAlign: 'center',
-            marginBottom: '24px'
-        },
-        divider: {
-            margin: '16px 0',
-            textAlign: 'center',
-            color: '#888',
-            position: 'relative'
-        },
-        googleButton: {
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            marginTop: '8px',
-            backgroundColor: '#fff',
-            border: '1px solid #d9d9d9',
-            boxShadow: '0 2px 0 rgba(0, 0, 0, 0.02)'
-        },
-        switchText: {
-            textAlign: 'center',
-            marginTop: '16px'
-        },
-        link: {
-            color: 'var(--accent-9)',
-            cursor: 'pointer',
-            marginLeft: '4px'
+            message.error('Failed to sign out. Please try again.')
         }
     }
 
@@ -221,14 +424,70 @@ const LandingPage = () => {
 
     return (
         <Theme appearance={isDarkMode ? 'dark' : 'light'}>
-            <Box style={{ minHeight: '100vh' }}>
+            <Box style={{ 
+                height: '100vh', 
+                background: 'var(--gray-1)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                position: 'relative'
+            }}>
+                {/* Theme Toggle and Auth Buttons */}
+                <HeaderButtons>
+                    <ButtonContainer>
+                        {user ? (
+                            <AuthButton 
+                                variant="soft" 
+                                onClick={handleSignOut}
+                            >
+                                Sign Out
+                            </AuthButton>
+                        ) : (
+                            <>
+                                <AuthButton 
+                                    variant="soft" 
+                                    onClick={openSignIn}
+                                >
+                                    Sign In
+                                </AuthButton>
+                                <AuthButton 
+                                    variant="solid" 
+                                    onClick={openSignUp}
+                                >
+                                    Sign Up
+                                </AuthButton>
+                            </>
+                        )}
+                    </ButtonContainer>
+                    <ThemeToggle 
+                        variant="soft" 
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                    >
+                        {isDarkMode ? <SunIcon /> : <MoonIcon />}
+                    </ThemeToggle>
+                </HeaderButtons>
+
                 {/* Auth Modals */}
-                <Modal
-                    title={<Heading size="4" style={modalStyle.header}>Sign In</Heading>}
+                <StyledModal
+                    title={
+                        <Heading 
+                            size="4" 
+                            style={{ 
+                                textAlign: 'center', 
+                                marginBottom: '24px',
+                                color: 'var(--gray-12)'
+                            }}
+                        >
+                            Welcome Back
+                        </Heading>
+                    }
                     open={isSignInOpen}
-                    onCancel={() => setIsSignInOpen(false)}
+                    onCancel={() => {
+                        setIsSignInOpen(false);
+                        form.resetFields();
+                    }}
                     footer={null}
-                    width={400}
+                    width={window.innerWidth > 480 ? 400 : '95%'}
                 >
                     <Form
                         form={form}
@@ -241,7 +500,7 @@ const LandingPage = () => {
                             rules={[{ required: true, message: 'Please input your email!' }]}
                         >
                             <Input 
-                                prefix={<MailOutlined style={{ color: '#888' }} />}
+                                prefix={<MailOutlined />}
                                 placeholder="Email"
                             />
                         </Form.Item>
@@ -251,51 +510,65 @@ const LandingPage = () => {
                             rules={[{ required: true, message: 'Please input your password!' }]}
                         >
                             <Input.Password 
-                                prefix={<LockOutlined style={{ color: '#888' }} />}
+                                prefix={<LockOutlined />}
                                 placeholder="Password"
                             />
                         </Form.Item>
 
-                        <Form.Item>
-                            <Button type="primary" htmlType="submit" block>
+                        <Form.Item style={{ textAlign: 'center' }}>
+                            <AuthButton type="primary" htmlType="submit">
                                 Sign In
-                            </Button>
+                            </AuthButton>
                         </Form.Item>
 
-                        <div style={modalStyle.divider}>
-                            <Text size="2">OR</Text>
-                        </div>
+                        <Divider>
+                            <Text size="2" style={{ color: 'var(--gray-11)', padding: '0 10px' }}>
+                                OR
+                            </Text>
+                        </Divider>
 
-                        <Button 
-                            style={modalStyle.googleButton}
-                            onClick={handleGoogleSignIn}
-                            icon={<GoogleOutlined style={{ fontSize: '16px' }} />}
-                        >
+                        <GoogleButton onClick={handleGoogleSignIn}>
+                            <GoogleOutlined style={{ fontSize: '18px' }} />
                             Continue with Google
-                        </Button>
+                        </GoogleButton>
 
-                        <div style={modalStyle.switchText}>
-                            <Text size="2">
-                                Don&apos;t have an account?
-                                <Text 
-                                    as="span" 
-                                    style={modalStyle.link}
-                                    onClick={openSignUp}
-
+                        <SwitchText>
+                            <Text size="2" style={{ color: 'var(--gray-11)' }}>
+                                Dont have an account?
+                                <LinkText 
+                                    as="span"
+                                    onClick={() => {
+                                        setIsSignInOpen(false);
+                                        setIsSignUpOpen(true);
+                                    }}
                                 >
                                     Sign up
-                                </Text>
+                                </LinkText>
                             </Text>
-                        </div>
+                        </SwitchText>
                     </Form>
-                </Modal>
+                </StyledModal>
 
-                <Modal
-                    title={<Heading size="4" style={modalStyle.header}>Create Account</Heading>}
+                <StyledModal
+                    title={
+                        <Heading 
+                            size="4" 
+                            style={{ 
+                                textAlign: 'center', 
+                                marginBottom: '24px',
+                                color: 'var(--gray-12)'
+                            }}
+                        >
+                            Create Account
+                        </Heading>
+                    }
                     open={isSignUpOpen}
-                    onCancel={() => setIsSignUpOpen(false)}
+                    onCancel={() => {
+                        setIsSignUpOpen(false);
+                        form.resetFields();
+                    }}
                     footer={null}
-                    width={400}
+                    width={window.innerWidth > 480 ? 400 : '95%'}
                 >
                     <Form
                         form={form}
@@ -311,7 +584,7 @@ const LandingPage = () => {
                             ]}
                         >
                             <Input 
-                                prefix={<MailOutlined style={{ color: '#888' }} />}
+                                prefix={<MailOutlined />}
                                 placeholder="Email"
                             />
                         </Form.Item>
@@ -324,154 +597,247 @@ const LandingPage = () => {
                             ]}
                         >
                             <Input.Password 
-                                prefix={<LockOutlined style={{ color: '#888' }} />}
+                                prefix={<LockOutlined />}
                                 placeholder="Password"
                             />
                         </Form.Item>
 
-                        <Form.Item>
-                            <Button type="primary" htmlType="submit" block>
+                        <Form.Item style={{ textAlign: 'center' }}>
+                            <AuthButton type="primary" htmlType="submit">
                                 Sign Up
-                            </Button>
+                            </AuthButton>
                         </Form.Item>
 
-                        <div style={modalStyle.divider}>
-                            <Text size="2">OR</Text>
-                        </div>
+                        <Divider>
+                            <Text size="2" style={{ color: 'var(--gray-11)', padding: '0 10px' }}>
+                                OR
+                            </Text>
+                        </Divider>
 
-                        <Button 
-                            style={modalStyle.googleButton}
-                            onClick={handleGoogleSignIn}
-                            icon={<GoogleOutlined style={{ fontSize: '16px' }} />}
-                        >
+                        <GoogleButton onClick={handleGoogleSignIn}>
+                            <GoogleOutlined style={{ fontSize: '18px' }} />
                             Continue with Google
-                        </Button>
+                        </GoogleButton>
 
-                        <div style={modalStyle.switchText}>
-                            <Text size="2">
+                        <SwitchText>
+                            <Text size="2" style={{ color: 'var(--gray-11)' }}>
                                 Already have an account?
-                                <Text 
-                                    as="span" 
-                                    style={modalStyle.link}
-                                    onClick={openSignIn}
+                                <LinkText 
+                                    as="span"
+                                    onClick={() => {
+                                        setIsSignUpOpen(false);
+                                        setIsSignInOpen(true);
+                                        form.resetFields();
+                                    }}
                                 >
                                     Sign in
-                                </Text>
+                                </LinkText>
                             </Text>
-                        </div>
+                        </SwitchText>
                     </Form>
-                </Modal>
+                </StyledModal>
 
-                {/* Theme Toggle and Auth Buttons */}
-                <Box style={{ position: 'absolute', top: '20px', right: '20px' }}>
-                    <Flex gap="2" align="center">
-                        {user ? (
-                            <Button variant="soft" onClick={handleSignOut}>
-                                Sign Out
-                            </Button>
-                        ) : (
-                            <>
-                                <Button variant="soft" onClick={openSignIn}>
-                                    Sign In
-                                </Button>
-                                <Button variant="solid" onClick={openSignUp}>
-                                    Sign Up
-                                </Button>
-                            </>
-                        )}
-                        <Button variant="soft" onClick={() => setIsDarkMode(!isDarkMode)}>
-                            {isDarkMode ? <SunIcon /> : <MoonIcon />}
-                        </Button>
-                    </Flex>
-                </Box>
+                {/* Main Content */}
+                <Flex 
+                    direction="column" 
+                    style={{ 
+                        flex: 1,
+                        height: '100%',
+                        position: 'relative'
+                    }}
+                >
+                    {/* Animated Background Pattern */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.4 }}
+                        transition={{ duration: 1.5 }}
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'radial-gradient(circle at 50% 50%, var(--accent-3) 0%, transparent 70%)',
+                            pointerEvents: 'none'
+                        }}
+                    />
 
-                {/* Hero Section */}
-                <Box style={{
-                    background: 'var(--accent-2)',
-                    padding: '80px 0',
-                    borderBottom: '1px solid var(--gray-5)'
-                }}>
-                    <Container size="3">
-                        <Flex direction="column" gap="4" align="center">
-                            <Heading size="9" align="center">ESG Dashboard</Heading>
-                            <Text size="5" align="center" style={{ maxWidth: '600px' }}>
-                               
+                    {/* Content Container */}
+                    <Flex 
+                        direction="column" 
+                        align="center" 
+                        justify="center" 
+                        style={{ 
+                            flex: 1,
+                            padding: '0 20px',
+                            position: 'relative'
+                        }}
+                    >
+                        {/* Hero Section */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, delay: 0.3 }}
+                            style={{ marginBottom: '40px', textAlign: 'center' }}
+                        >
+                            <Heading 
+                                size="9" 
+                                style={{
+                                    background: 'linear-gradient(to right, var(--accent-9), var(--accent-11))',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    marginBottom: '16px'
+                                }}
+                            >
+                                ESG Dashboard
+                            </Heading>
+                            <Text 
+                                size="5" 
+                                style={{ 
+                                    maxWidth: '600px',
+                                    color: 'var(--gray-11)',
+                                    lineHeight: '1.4'
+                                }}
+                            >
+                                Transform your ESG data into actionable insights
                             </Text>
-                        </Flex>
-                    </Container>
-                </Box>
+                        </motion.div>
 
-                {/* File Upload Section */}
-                <Container size="2" style={{ padding: '60px 20px' }}>
-                    <Flex direction="column" gap="4">
-                        <Heading size="6" align="center">Upload Your ESG Report</Heading>
-                        <Text align="center" size="4">
-                            Upload your ESG report in CSV, Excel, or JSON format for instant analysis
-                        </Text>
-                        
-                        <Box
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            style={{
-                                border: `2px dashed ${isDragging ? 'var(--accent-9)' : 'var(--gray-6)'}`,
-                                borderRadius: '8px',
-                                padding: '40px',
-                                textAlign: 'center',
-                                backgroundColor: isDragging ? 'var(--accent-2)' : 'var(--gray-2)',
-                                transition: 'all 0.2s ease',
-                                cursor: 'pointer'
+                        {/* Upload Section */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.8, delay: 0.5 }}
+                            style={{ 
+                                width: '100%',
+                                maxWidth: '600px',
+                                margin: '0 auto'
                             }}
                         >
-                            <input
-                                type="file"
-                                onChange={handleFileSelect}
-                                style={{ display: 'none' }}
-                                id="fileInput"
-                                accept=".csv,.xlsx,.xls,.json"
-                            />
-                            <label htmlFor="fileInput" style={{ cursor: 'pointer' }}>
-                                <Flex direction="column" gap="3" align="center">
-                                    <UploadIcon width={24} height={24} />
-                                    {file ? (
-                                        <Text size="3">Selected file: {file.name}</Text>
-                                    ) : (
-                                        <>
-                                            <Text size="3">Drag and drop your file here or click to select</Text>
-                                            <Text size="2" color="gray">Supported formats: CSV, Excel, JSON</Text>
-                                        </>
-                                    )}
-                                </Flex>
-                            </label>
-                        </Box>
+                            <Box
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                style={{
+                                    border: `2px dashed ${isDragging ? 'var(--accent-9)' : 'var(--gray-6)'}`,
+                                    borderRadius: '16px',
+                                    padding: '40px',
+                                    textAlign: 'center',
+                                    backgroundColor: isDragging ? 'var(--accent-2)' : 'var(--gray-2)',
+                                    transition: 'all 0.3s ease',
+                                    cursor: user ? 'pointer' : 'not-allowed',
+                                    opacity: user ? 1 : 0.8
+                                }}
+                            >
+                                <input
+                                    type="file"
+                                    onChange={handleFileSelect}
+                                    style={{ display: 'none' }}
+                                    id="fileInput"
+                                    accept=".csv,.xlsx,.xls,.json"
+                                    disabled={!user}
+                                />
+                                <label htmlFor="fileInput" style={{ cursor: user ? 'pointer' : 'not-allowed' }}>
+                                    <Flex direction="column" gap="3" align="center">
+                                        <motion.div
+                                            whileHover={user ? { scale: 1.05 } : {}}
+                                            whileTap={user ? { scale: 0.95 } : {}}
+                                            style={{
+                                                background: user ? 'var(--accent-3)' : 'var(--gray-4)',
+                                                borderRadius: '50%',
+                                                width: '56px',
+                                                height: '56px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                marginBottom: '12px'
+                                            }}
+                                        >
+                                            <UploadIcon width={24} height={24} style={{ color: user ? 'var(--accent-9)' : 'var(--gray-8)' }} />
+                                        </motion.div>
+                                        {!user ? (
+                                            <>
+                                                <Text size="3" weight="medium" style={{ color: 'var(--gray-11)' }}>
+                                                    Please sign in to upload files
+                                                </Text>
+                                                <Button 
+                                                    variant="soft" 
+                                                    onClick={() => setIsSignInOpen(true)}
+                                                    style={{ marginTop: '8px' }}
+                                                >
+                                                    Sign In
+                                                </Button>
+                                            </>
+                                        ) : file ? (
+                                            <Text size="3" weight="medium" style={{ color: 'var(--accent-11)' }}>
+                                                Selected file: {file.name}
+                                            </Text>
+                                        ) : (
+                                            <>
+                                                <Text size="3" weight="medium">
+                                                    Drag and drop your file here or click to select
+                                                </Text>
+                                                <Text size="2" color="gray">
+                                                    Supported formats: CSV, Excel, JSON
+                                                </Text>
+                                            </>
+                                        )}
+                                    </Flex>
+                                </label>
+                            </Box>
 
-                        {error && (
-                            <Text color="red" size="2" align="center">
-                                {error}
-                            </Text>
-                        )}
-
-                        {isProcessing && (
-                            <Text size="2" color="gray" align="center">
-                                Processing your file...
-                            </Text>
-                        )}
-
-                        {file && !isProcessing && (
-                            <Flex justify="center">
-                                <Button 
-                                    size="3" 
-                                    variant="solid"
-                                    onClick={handleAnalyzeReport}
+                            {error && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.3 }}
                                 >
-                                    Analyze Report
-                                </Button>
-                            </Flex>
-                        )}
+                                    <Text color="red" size="2" align="center" style={{ marginTop: '12px' }}>
+                                        {error}
+                                    </Text>
+                                </motion.div>
+                            )}
 
-                      
+                            {isProcessing && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    <Text size="2" color="gray" align="center" style={{ marginTop: '12px' }}>
+                                        Processing your file...
+                                    </Text>
+                                </motion.div>
+                            )}
+
+                            {file && !isProcessing && user && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                >
+                                    <Flex justify="center" style={{ marginTop: '20px' }}>
+                                        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                                            <Button 
+                                                size="3" 
+                                                variant="solid"
+                                                onClick={handleAnalyzeReport}
+                                                style={{
+                                                    background: 'var(--accent-9)',
+                                                    transition: 'all 0.2s ease',
+                                                    padding: '0 32px',
+                                                    height: '44px'
+                                                }}
+                                            >
+                                                Analyze Report
+                                            </Button>
+                                        </motion.div>
+                                    </Flex>
+                                </motion.div>
+                            )}
+                        </motion.div>
                     </Flex>
-                </Container>
+                </Flex>
             </Box>
         </Theme>
     )
