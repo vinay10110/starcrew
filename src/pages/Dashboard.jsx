@@ -69,7 +69,11 @@ const Dashboard = () => {
   }
 
   const handleNewFileUpload = () => {
-    navigate('/');
+    navigate('/', { 
+        state: { 
+            skipRedirect: true 
+        } 
+    });
   }
 
   const handleCompareClick = () => {
