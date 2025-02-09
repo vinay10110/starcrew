@@ -50,8 +50,7 @@ Our predictive analytics feature utilizes a **Deep Learning Model** structured a
 ## Installation & Setup
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/esg-dashboard.git
-   cd esg-dashboard
+   git clone https://github.com/vinay10110/starcrew.git
    ```
 2. Install dependencies:
    ```sh
@@ -74,14 +73,12 @@ Our predictive analytics feature utilizes a **Deep Learning Model** structured a
 ## Contributing
 Contributions are welcome! Feel free to fork this repository and submit a pull request.
 
-## License
-This project is licensed under the MIT License.
-
 ## Contact
 For any questions or support, please reach out to us.
 
 ---
-**Team:** vinay10110
+**Team:** starcrew
 - Sai Vinay Chakravarthi
 - Mabhu Subhani Shaik
+- Yaswanth Bhimavarapu
 
