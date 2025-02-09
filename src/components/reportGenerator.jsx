@@ -174,10 +174,10 @@ const Dashboard = () => {
                 };
 
                 await emailjs.send(
-                    'your_service_id',
-                    'your_template_id',
+                    'service_4c4lrys',
+                    'template_v3omh7d',
                     templateParams,
-                    'your_user_id'
+                    'M05VUeah4EtYTrOsP'
                 );
 
                 alert("Report sent successfully!");

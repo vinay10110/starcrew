@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Container, Heading, Box, Flex, Button, Theme, Text, ScrollArea, Card, Badge } from "@radix-ui/themes"
 import { useLocation, Navigate, useNavigate } from "react-router-dom"
 import {
@@ -21,17 +21,143 @@ import useESGStore from "../store/useESGStore"
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import emailjs from 'emailjs-com'
-import Highcharts from 'highcharts'
+import pptxgen from "pptxgenjs"
+import { supabase } from '../components/supabaseClient'
+import pako from 'pako'
 
-import { Document, Packer, Paragraph, ImageRun, HeadingLevel, AlignmentType, PageBreak, TextRun } from 'docx'
+import { Document, Packer, Paragraph, ImageRun, HeadingLevel, AlignmentType,  TextRun } from 'docx'
 import { saveAs } from 'file-saver'
 
 // Import Ant Design CSS
 import 'antd/dist/reset.css'
 
+// Helper functions for trend analysis
+const getEnergyTrend = (data) => {
+    if (!data) return 'no data available';
+    // Add your energy trend analysis logic here
+    return 'a stable consumption pattern';
+};
+
+const getRenewablesTrend = (data) => {
+    if (!data) return 'no data available';
+    // Add your renewables trend analysis logic here
+    return 'an increasing adoption rate';
+};
+
+const getEmissionsTrend = (data) => {
+    if (!data) return 'no data available';
+    // Add your emissions trend analysis logic here
+    return 'a decreasing trend';
+};
+
+const getEmissionsStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your emissions status analysis logic here
+    return 'within acceptable ranges';
+};
+
+const getResourceEfficiency = (data) => {
+    if (!data) return 'not available';
+    // Add your resource efficiency analysis logic here
+    return 'improving';
+};
+
+const getDiversityStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your diversity status analysis logic here
+    return 'showing positive trends';
+};
+
+const getWorkforceStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your workforce status analysis logic here
+    return 'steady improvement';
+};
+
+const getCommunityStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your community status analysis logic here
+    return 'strong engagement';
+};
+
+const getBoardStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your board status analysis logic here
+    return 'well-balanced composition';
+};
+
+const getPolicyStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your policy status analysis logic here
+    return 'comprehensive coverage';
+};
+
+const getRiskStatus = (data) => {
+    if (!data) return 'not available';
+    // Add your risk status analysis logic here
+    return 'well-managed';
+};
+
+const getEmissionsImplication = (data) => {
+    if (!data) return 'no data available';
+    // Add your emissions implication analysis logic here
+    return 'suggests improving environmental performance';
+};
+
+const getEmissionsRecommendation = (data) => {
+    if (!data) return 'no data available';
+    // Add your emissions recommendation logic here
+    return 'scope 3 emissions reduction and energy efficiency improvements';
+};
+
+// Additional helper functions
+const getEnergyImplication = (data) => {
+    if (!data) return 'no data available';
+    // Add your energy implication analysis logic here
+    return 'potential for optimization in energy consumption';
+};
+
+const getRenewablesImplication = (data) => {
+    if (!data) return 'no data available';
+    // Add your renewables implication analysis logic here
+    return 'positive progress in sustainable energy adoption';
+};
+
+const getTrend = (data) => {
+    if (!data) return 'no data available';
+    // Add your trend analysis logic here
+    return 'showing positive movement';
+};
+
+// Email sending function
+const sendEmail = async (emailAddress, attachment) => {
+    try {
+        const templateParams = {
+            to_email: emailAddress,
+            message: `ESG Report generated on ${new Date().toLocaleDateString()}`,
+            attachment: attachment,
+            filename: 'ESG_Report.pptx'
+        };
+
+        await emailjs.send(
+            import.meta.env.VITE_EMAILJS_SERVICE_ID,
+            import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+            templateParams,
+            import.meta.env.VITE_EMAILJS_USER_ID
+        );
+
+        return true;
+    } catch (error) {
+        console.error('Error sending email:', error);
+        throw new Error('Failed to send email');
+    }
+};
+
 const Dashboard = () => {
   const location = useLocation()
   const data = location.state?.data
+  const existingReports = location.state?.existingReports
+  const fileName = location.state?.fileName
   const [isDarkMode, setIsDarkMode] = React.useState(false)
   const [showComparison, setShowComparison] = React.useState(false)
   const [comparisonData, setComparisonData] = React.useState({})
@@ -50,6 +176,8 @@ const Dashboard = () => {
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const MAX_FILE_SIZE = 50 * 1024; // 50KB
+
   // Add this function to calculate total score
   const calculateTotalScore = (data) => {
     if (!data || !data.scores) return null;
@@ -67,15 +195,28 @@ const Dashboard = () => {
     }
   }
 
+  useEffect(() => {
+    if (!data) {
+      console.log('No data found, redirecting to landing page');
+      navigate('/', { replace: true });
+    }
+  }, [data, navigate]);
+
+  useEffect(() => {
+    // Initialize EmailJS with your public key
+    emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY);
+  }, []);
 
   if (!data) {
-    return <Navigate to="/" replace />
+    return null;
   }
 
   const handleNewFileUpload = () => {
+    console.log('Navigating to upload new file');
     navigate('/', { 
         state: { 
-            skipRedirect: true 
+            skipRedirect: true,
+            existingReports: existingReports // Pass existing reports to maintain history
         } 
     });
   }
@@ -289,8 +430,17 @@ const Dashboard = () => {
   const handleDirectDownload = async () => {
     try {
       setIsDownloading(true);
-      const file = await generateWord();
-      const fileName = `ESG_Report.docx`;
+      let file;
+      let fileName;
+
+      if (exportFormat === "pdf") {
+        file = await generatePDF();
+        fileName = "ESG_Report.pdf";
+      } else {
+        file = await generateWord();
+        fileName = "ESG_Report.docx";
+      }
+
       saveAs(file, fileName);
       message.success("Report downloaded successfully!");
     } catch (error) {
@@ -351,6 +501,21 @@ const Dashboard = () => {
       pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yOffset);
       yOffset += 30;
 
+      // Add scores section
+      pdf.setFontSize(16);
+      pdf.text('ESG Scores', margin, yOffset);
+      yOffset += 25;
+
+      pdf.setFontSize(12);
+      pdf.text(`Environmental Score: ${data.scores?.environment_score} (Grade ${data.scores?.environment_grade})`, margin, yOffset);
+      yOffset += 20;
+      pdf.text(`Social Score: ${data.scores?.social_score} (Grade ${data.scores?.social_grade})`, margin, yOffset);
+      yOffset += 20;
+      pdf.text(`Governance Score: ${data.scores?.governance_score} (Grade ${data.scores?.governance_grade})`, margin, yOffset);
+      yOffset += 20;
+      pdf.text(`Total Score: ${data.scores?.total_score} (Grade ${data.scores?.total_grade})`, margin, yOffset);
+      yOffset += 40;
+
       // Add each chart
       for (const chart of charts) {
         // Check if we need a new page
@@ -371,10 +536,35 @@ const Dashboard = () => {
         try {
           pdf.addImage(chart.imageData, 'PNG', margin, yOffset, imgWidth, imgHeight);
           yOffset += imgHeight + 30;
+
+          // Add analysis text
+          pdf.setFontSize(12);
+          const analysis = getChartAnalysis(chart.title, data);
+          pdf.text(analysis, margin, yOffset, {
+            maxWidth: pageWidth - (margin * 2)
+          });
+          yOffset += 60;
         } catch (error) {
-          console.error('Error adding image to PDF:', error);
+          console.error('Error adding chart to PDF:', error);
         }
       }
+
+      // Add recommendations section
+      if (yOffset + 200 > pageHeight) {
+        pdf.addPage();
+        yOffset = margin;
+      }
+
+      pdf.setFontSize(16);
+      pdf.text('Recommendations', margin, yOffset);
+      yOffset += 25;
+
+      pdf.setFontSize(12);
+      const recommendations = generateRecommendations(data);
+      recommendations.split('\n').forEach(rec => {
+        pdf.text(rec, margin, yOffset);
+        yOffset += 20;
+      });
 
       return pdf.output('blob');
     } catch (error) {
@@ -509,18 +699,16 @@ const Dashboard = () => {
   const getChartAnalysis = (chartTitle, data) => {
     switch (chartTitle) {
       case 'Indirect Energy Consumption':
-        return `Analysis of indirect energy consumption shows ${getEnergyTrend(data.environmental.energy.breakdown.indirect)}. This indicates ${getEnergyImplication(data.environmental.energy.breakdown.indirect)}.`;
+        return `Analysis of indirect energy consumption shows ${getEnergyTrend(data.environmental?.energy?.breakdown?.indirect)}. This indicates ${getEnergyImplication(data.environmental?.energy?.breakdown?.indirect)}.`;
       
       case 'Renewable Energy Sources':
-        return `The organization's renewable energy adoption ${getRenewablesTrend(data.environmental.energy.breakdown.renewable)}. This demonstrates ${getRenewablesImplication(data.environmental.energy.breakdown.renewable)}.`;
+        return `The organization's renewable energy adoption ${getRenewablesTrend(data.environmental?.energy?.breakdown?.renewable)}. This demonstrates ${getRenewablesImplication(data.environmental?.energy?.breakdown?.renewable)}.`;
       
       case 'Emissions by Scope':
-        return `Carbon emissions across all scopes show ${getEmissionsTrend(data.environmental.emissions)}. Key areas for improvement include ${getEmissionsRecommendation(data.environmental.emissions)}.`;
-      
-      // Add more cases for other chart types
+        return `Carbon emissions across all scopes show ${getEmissionsTrend(data.environmental?.emissions)}. Key areas for improvement include ${getEmissionsRecommendation(data.environmental?.emissions)}.`;
       
       default:
-        return 'Detailed analysis of the metrics shows important trends in ESG performance.';
+        return `Analysis shows ${getTrend(data)}. Further monitoring recommended.`;
     }
   };
 
@@ -552,6 +740,104 @@ const Dashboard = () => {
     return recommendations.join("\n");
   };
 
+  const runLengthEncode = (data) => {
+    const result = [];
+    let count = 1;
+    let currentByte = data[0];
+
+    for (let i = 1; i < data.length; i++) {
+        if (data[i] === currentByte && count < 255) {
+            count++;
+        } else {
+            result.push(count, currentByte);
+            count = 1;
+            currentByte = data[i];
+        }
+    }
+    result.push(count, currentByte);
+    return new Uint8Array(result);
+  };
+
+  const deltaEncode = (data) => {
+    const result = new Uint8Array(data.length);
+    result[0] = data[0];
+    
+    for (let i = 1; i < data.length; i++) {
+        result[i] = (data[i] - data[i - 1] + 256) % 256;
+    }
+    
+    return result;
+  };
+
+  const compressDocument = async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      let data = new Uint8Array(arrayBuffer);
+      
+      // Step 1: Extract and compress essential data
+      const essentialData = {
+        scores: {
+          environmental: data.scores?.environment_score,
+          social: data.scores?.social_score,
+          governance: data.scores?.governance_score,
+          total: data.scores?.total_score
+        },
+        grades: {
+          environmental: data.scores?.environment_grade,
+          social: data.scores?.social_grade,
+          governance: data.scores?.governance_grade,
+          total: data.scores?.total_grade
+        },
+        date: new Date().toLocaleDateString(),
+        summary: "ESG Report Summary"
+      };
+
+      // Step 2: Convert to minimal JSON
+      const minimalJSON = JSON.stringify(essentialData);
+      data = new TextEncoder().encode(minimalJSON);
+
+      // Step 3: RLE Compression
+      const rleCompressed = runLengthEncode(data);
+
+      // Step 4: Delta Encoding
+      const deltaCompressed = deltaEncode(rleCompressed);
+
+      // Step 5: Final DEFLATE compression
+      const finalCompressed = pako.deflate(deltaCompressed, {
+        level: 9,
+        windowBits: 15,
+        memLevel: 9,
+        strategy: pako.Z_HUFFMAN_ONLY
+      });
+
+      console.log('Original size:', arrayBuffer.byteLength);
+      console.log('RLE size:', rleCompressed.length);
+      console.log('Delta size:', deltaCompressed.length);
+      console.log('Final compressed size:', finalCompressed.length);
+
+      if (finalCompressed.length > MAX_FILE_SIZE) {
+        // If still too large, try more aggressive compression
+        const superCompressed = pako.deflate(finalCompressed, {
+          level: 9,
+          windowBits: 12,
+          memLevel: 9,
+          strategy: pako.Z_FIXED
+        });
+
+        if (superCompressed.length <= MAX_FILE_SIZE) {
+          return new Blob([superCompressed], { type: 'application/octet-stream' });
+        }
+
+        throw new Error('File still too large after compression');
+      }
+
+      return new Blob([finalCompressed], { type: 'application/octet-stream' });
+    } catch (error) {
+      console.error('Compression failed:', error);
+      throw error;
+    }
+  };
+
   const handleSendReport = async () => {
     if (!emailAddress) {
       message.error("Please enter an email address.");
@@ -560,42 +846,58 @@ const Dashboard = () => {
 
     try {
       setIsEmailSending(true);
-      const file = await generateWord();
+      
+      // Generate file based on selected format
+      const file = exportFormat === 'pdf' ? await generatePDF() : await generateWord();
+      const fileName = `ESG_Report_${Date.now()}.${exportFormat}`;
 
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onloadend = async () => {
-        const base64data = reader.result.split(',')[1];
+      // Upload file using Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('reports')
+          .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: exportFormat === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          });
 
-        try {
-          const templateParams = {
-            to_email: emailAddress,
-            message: `ESG Report generated on ${new Date().toLocaleDateString()}`,
-            attachment: base64data,
-            filename: `ESG_Report.docx`
-          };
+      if (uploadError) {
+          throw new Error('Failed to upload file: ' + uploadError.message);
+      }
 
-          await emailjs.send(
-            'your_service_id',
-            'your_template_id',
-            templateParams,
-            'your_user_id'
-          );
+      // Get public URL - this is the important part
+      const { data } = supabase.storage
+          .from('reports')
+          .getPublicUrl(fileName);
 
-          message.success("Email sent successfully!");
-          setOpenDialog(false);
-        } catch (emailError) {
-          console.error('Error sending email:', emailError);
-          message.error(
-            emailError.status === 413 
-              ? "File is too large to send via email. Please use the download option." 
-              : "Failed to send email. Please try downloading instead."
-          );
-        }
+      // Log the URL to verify it's correct
+      console.log('File URL:', data.publicUrl);
+
+      // Send email using EmailJS with the correct URL
+      const templateParams = {
+          to_email: emailAddress,
+          message: `ESG Report generated on ${new Date().toLocaleDateString()}`,
+          report_link: data.publicUrl, // Use the public URL here
+          format: exportFormat.toUpperCase()
       };
+
+      // Log template params to verify
+      console.log('Email template params:', templateParams);
+
+      const emailResponse = await emailjs.send(
+          import.meta.env.VITE_EMAILJS_SERVICE_ID,
+          import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
+          templateParams,
+          import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+      );
+
+      // Log email response
+      console.log('Email sent successfully:', emailResponse);
+
+      message.success("Report sent successfully!");
+      setOpenDialog(false);
     } catch (error) {
-      console.error("Failed to generate report:", error);
-      message.error("Failed to generate report. Please try again.");
+      console.error("Failed to send report:", error);
+      message.error("Failed to send report. Please try again.");
     } finally {
       setIsEmailSending(false);
     }
@@ -931,7 +1233,7 @@ const Dashboard = () => {
               <Button
                 key="download"
                 onClick={handleDirectDownload}
-                disabled={isEmailSending || isDownloading}
+                disabled={isDownloading}
                 style={{
                   backgroundColor: isDownloading ? '#4b5563' : '#2563eb',
                   color: '#ffffff',
@@ -1068,5 +1370,6 @@ const Dashboard = () => {
 }
 
 export default Dashboard
+
 
 

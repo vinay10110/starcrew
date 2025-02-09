@@ -861,7 +861,7 @@ const LandingPage = () => {
                                                     Drag and drop your file here or click to select
                                                 </Text>
                                                 <Text size="2" color="gray">
-                                                    Supported formats: CSV, Excel, JSON
+                                                    Supported formats: JSON
                                                 </Text>
                                             </>
                                         )}
