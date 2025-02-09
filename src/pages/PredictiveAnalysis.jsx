@@ -182,10 +182,13 @@ const PredictiveAnalysis = () => {
         setError(null);
         try {
             const historicalData = prepareData(esgData, selectedMetric, selectedSubMetric);
-            if (historicalData.length < 5) throw new Error('At least 5 years of data required.');
+            
+            if (historicalData.length < 3) {
+                throw new Error(`Insufficient historical data. You have ${historicalData.length} years of data, but at least 3 years are required for predictions.`);
+            }
 
             const values = historicalData.map(d => d.value);
-            const sequenceLength = 3;
+            const sequenceLength = Math.min(3, Math.floor(historicalData.length / 2));
             const X = [];
             const y = [];
 
