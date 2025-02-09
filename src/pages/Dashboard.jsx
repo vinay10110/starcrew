@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react"
-import { Container, Heading, Box, Flex, Button, Theme, Text, ScrollArea, Card, Badge } from "@radix-ui/themes"
+import { Container, Heading, Box, Flex, Button, Theme, Text, ScrollArea, Card, Badge, Select } from "@radix-ui/themes"
 import { useLocation, Navigate, useNavigate } from "react-router-dom"
 import {
   MoonIcon,
@@ -12,7 +12,7 @@ import {
   ChevronRightIcon,
   Cross2Icon,
 } from "@radix-ui/react-icons"
-import { Modal, Input, Form, Select, message } from 'antd'
+import { Modal, Input, Form, message } from 'antd'
 import Environmental from "../components/Environmental.jsx"
 import Social from "../components/Social.jsx"
 import Governance from "../components/Governance.jsx"
@@ -24,6 +24,7 @@ import emailjs from 'emailjs-com'
 import pptxgen from "pptxgenjs"
 import { supabase } from '../components/supabaseClient'
 import pako from 'pako'
+import { motion, AnimatePresence } from 'framer-motion'
 
 import { Document, Packer, Paragraph, ImageRun, HeadingLevel, AlignmentType,  TextRun } from 'docx'
 import { saveAs } from 'file-saver'
@@ -192,7 +193,8 @@ const Dashboard = () => {
   const [openDialog, setOpenDialog] = React.useState(false)
   const [generatedFile, setGeneratedFile] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-
+  const [selectedIndustry, setSelectedIndustry] = useState('all');
+  const [sortBy, setSortBy] = useState('rank'); // 'rank' or 'score'
   // Add separate loading states for each button
   const [isEmailSending, setIsEmailSending] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -985,6 +987,275 @@ const Dashboard = () => {
     return recommendations;
   };
 
+  // Get unique industries from the data
+  const getUniqueIndustries = () => {
+      const industries = industriesData.map(company => company.industry);
+      return ['all', ...new Set(industries)].map(industry => ({
+          value: industry,
+          label: industry === 'all' ? 'All Industries' : industry
+      }));
+  };
+
+  // Filter and sort companies based on selection
+  const getFilteredCompanies = () => {
+      let filtered = [...comparisonData.allCompanies];
+      
+      // Apply industry filter
+      if (selectedIndustry !== 'all') {
+          filtered = filtered.filter(company => company.industry === selectedIndustry);
+      }
+
+      // Apply sorting
+      filtered.sort((a, b) => {
+          if (sortBy === 'rank') {
+              return b.totalScore - a.totalScore;
+          } else {
+              return b.totalScore - a.totalScore;
+          }
+      });
+
+      return filtered;
+  };
+
+  // Update the comparison section JSX
+  const renderComparisonSection = () => {
+    const filteredCompanies = getFilteredCompanies();
+    const yourCompanyRank = filteredCompanies.findIndex(company => 
+        company.totalScore <= data.scores.total_score
+    ) + 1;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: 300 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 300 }}
+            transition={{ duration: 0.3 }}
+            style={{
+                position: 'fixed',
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: '400px',
+                background: isDarkMode ? darkModeColors.surface : 'white',
+                borderLeft: `1px solid ${isDarkMode ? darkModeColors.border : 'var(--gray-6)'}`,
+                display: 'flex',
+                flexDirection: 'column',
+                zIndex: 1000,
+                boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden' // Hide the main scrollbar
+            }}
+        >
+            {/* Header and Filters Section - Fixed */}
+            <Box style={{ padding: '24px', flexShrink: 0 }}>
+                <Flex justify="between" align="center" style={{ marginBottom: '20px' }}>
+                    <Heading size="4" style={{ 
+                        background: 'linear-gradient(90deg, #3B82F6, #8B5CF6)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent'
+                    }}>
+                        Industry Comparison
+                    </Heading>
+                    <Button 
+                        variant="ghost" 
+                        onClick={() => setShowComparison(false)}
+                        style={{ 
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        <Cross2Icon />
+                    </Button>
+                </Flex>
+
+                {/* Your Position Card */}
+                <Box style={{ 
+                    background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+                    padding: '20px',
+                    borderRadius: '12px',
+                    marginBottom: '16px'
+                }}>
+                    <Text size="2" weight="bold" style={{ color: 'white', marginBottom: '8px' }}>
+                        Your Position
+                    </Text>
+                    <Heading size="4" style={{ color: 'white', marginBottom: '4px' }}>
+                        Rank #{yourCompanyRank} of {filteredCompanies.length}
+                    </Heading>
+                    <Text size="2" style={{ color: 'rgba(255,255,255,0.8)' }}>
+                        in {selectedIndustry === 'all' ? 'All Industries' : selectedIndustry}
+                    </Text>
+                    <Flex align="center" gap="2" style={{ marginTop: '12px' }}>
+                        <Badge style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            padding: '4px 8px'
+                        }}>
+                            {data.scores.total_grade}
+                        </Badge>
+                        <Text weight="bold" style={{ color: 'white' }}>
+                            {data.scores.total_score.toFixed(1)}
+                        </Text>
+                    </Flex>
+                </Box>
+
+                {/* Filters */}
+                <Box style={{ marginBottom: '16px' }}>
+                    <Text size="2" weight="bold" style={{ 
+                        marginBottom: '8px',
+                        color: isDarkMode ? darkModeColors.text.secondary : 'inherit' 
+                    }}>
+                        Filter by Industry
+                    </Text>
+                    <Select.Root 
+                        value={selectedIndustry} 
+                        onValueChange={setSelectedIndustry}
+                        style={{ width: '100%' }}
+                    >
+                        <Select.Trigger 
+                            style={{
+                                width: '100%',
+                                height: '40px',
+                                borderRadius: '8px',
+                                border: `1px solid ${isDarkMode ? darkModeColors.border : 'var(--gray-6)'}`,
+                                background: isDarkMode ? 'rgba(255,255,255,0.05)' : 'white'
+                            }}
+                        />
+                        <Select.Content>
+                            {getUniqueIndustries().map(industry => (
+                                <Select.Item key={industry.value} value={industry.value}>
+                                    {industry.label}
+                                </Select.Item>
+                            ))}
+                        </Select.Content>
+                    </Select.Root>
+
+                    <Text size="2" weight="bold" style={{ 
+                        marginTop: '16px',
+                        marginBottom: '8px',
+                        color: isDarkMode ? darkModeColors.text.secondary : 'inherit' 
+                    }}>
+                        Sort by
+                    </Text>
+                    <Select.Root value={sortBy} onValueChange={setSortBy}>
+                        <Select.Trigger 
+                            style={{
+                                width: '100%',
+                                height: '40px',
+                                borderRadius: '8px',
+                                border: `1px solid ${isDarkMode ? darkModeColors.border : 'var(--gray-6)'}`,
+                                background: isDarkMode ? 'rgba(255,255,255,0.05)' : 'white'
+                            }}
+                        />
+                        <Select.Content>
+                            <Select.Item value="rank">Ranking</Select.Item>
+                            <Select.Item value="score">Score</Select.Item>
+                        </Select.Content>
+                    </Select.Root>
+                </Box>
+            </Box>
+
+            {/* Companies List - Scrollable */}
+            <Box style={{ 
+                flex: 1,
+                overflowY: 'auto',
+                padding: '0 24px 24px 24px',
+                marginRight: '-8px', // Compensate for scrollbar
+                paddingRight: '8px', // Add padding for scrollbar
+                '::-webkit-scrollbar': {
+                    width: '8px',
+                },
+                '::-webkit-scrollbar-track': {
+                    background: 'transparent',
+                },
+                '::-webkit-scrollbar-thumb': {
+                    background: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
+                    borderRadius: '4px',
+                },
+                '::-webkit-scrollbar-thumb:hover': {
+                    background: isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                }
+            }}>
+                <Flex direction="column" gap="2">
+                    {filteredCompanies.map((company, index) => (
+                        <motion.div
+                            key={company.name}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                        >
+                            <Card style={{
+                                width: '100%',
+                                background: company.totalScore === data.scores.total_score
+                                    ? isDarkMode 
+                                        ? 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))'
+                                        : 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1))'
+                                    : isDarkMode ? 'rgba(255,255,255,0.03)' : 'white',
+                                border: company.totalScore === data.scores.total_score
+                                    ? '2px solid #3B82F6'
+                                    : `1px solid ${isDarkMode ? darkModeColors.border : 'var(--gray-6)'}`,
+                                borderRadius: '12px',
+                                padding: '16px',
+                                position: 'relative',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                                }
+                            }}>
+                                <Flex direction="column" gap="2" style={{ width: '100%' }}>
+                                    <Flex justify="between" align="center" style={{ width: '100%' }}>
+                                        <Box style={{ flex: 1 }}>
+                                            <Text weight="bold" size="3" style={{ marginBottom: '4px' }}>
+                                                {company.name}
+                                            </Text>
+                                            <Flex align="center" gap="2">
+                                                <Text size="2" style={{ 
+                                                    color: isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'
+                                                }}>
+                                                    {company.industry}
+                                                </Text>
+                                                <Text size="2" style={{ 
+                                                    color: isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'
+                                                }}>
+                                                    Rank #{index + 1} of {filteredCompanies.length}
+                                                </Text>
+                                            </Flex>
+                                        </Box>
+                                        <Flex align="center" gap="3">
+                                            <Badge style={{
+                                                background: getGradeColor(company.totalGrade),
+                                                color: 'white',
+                                                padding: '4px 8px',
+                                                borderRadius: '6px'
+                                            }}>
+                                                {company.totalGrade}
+                                            </Badge>
+                                            <Text weight="bold" size="4">
+                                                {company.totalScore.toFixed(1)}
+                                            </Text>
+                                        </Flex>
+                                    </Flex>
+                                </Flex>
+                                {index < filteredCompanies.length - 1 && (
+                                    <Box style={{
+                                        width: '100%',
+                                        height: '1px',
+                                        background: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                                        margin: '8px 0'
+                                    }} />
+                                )}
+                            </Card>
+                        </motion.div>
+                    ))}
+                </Flex>
+            </Box>
+        </motion.div>
+    );
+  };
+
   return (
     <Theme appearance={isDarkMode ? "dark" : "light"}>
       <Box style={{ 
@@ -1049,133 +1320,7 @@ const Dashboard = () => {
         </Container>
 
         {/* Industry Comparison Sidebar */}
-        {showComparison && (
-          <Box
-            style={{
-              position: 'fixed',
-              top: 0,
-              right: 0,
-              width: '400px',
-              height: '100vh',
-              background: 'var(--gray-1)',
-              borderLeft: '1px solid var(--gray-6)',
-              padding: '20px',
-              overflowY: 'auto',
-              zIndex: 1000,
-            }}
-          >
-            <Flex justify="between" align="center" mb="4">
-              <Heading size="4">Industry Comparison</Heading>
-              <Button 
-                variant="ghost" 
-                onClick={() => setShowComparison(false)}
-              >
-                <Cross2Icon />
-              </Button>
-            </Flex>
-
-            <ScrollArea style={{ height: 'calc(100vh - 80px)' }}>
-              {/* User's Performance Card */}
-              <Card 
-                style={{ 
-                  backgroundColor: 'var(--accent-3)', 
-                  border: '2px solid var(--accent-6)',
-                  marginBottom: '24px'
-                }}
-              >
-                <Flex direction="column" gap="2">
-                  <Text size="4" weight="bold">Your Performance</Text>
-                  <Flex justify="between" align="center">
-                    <Text>Rank: #{comparisonData.rank} of {comparisonData.totalCompanies}</Text>
-                    <Text weight="bold">Score: {comparisonData.userScore}</Text>
-                  </Flex>
-                  <Flex gap="1" justify="end">
-                    <Badge color={getGradeColor(comparisonData.userGrades?.E)}>
-                      E: {comparisonData.userGrades?.E}
-                    </Badge>
-                    <Badge color={getGradeColor(comparisonData.userGrades?.S)}>
-                      S: {comparisonData.userGrades?.S}
-                    </Badge>
-                    <Badge color={getGradeColor(comparisonData.userGrades?.G)}>
-                      G: {comparisonData.userGrades?.G}
-                    </Badge>
-                  </Flex>
-                  <Text size="2" color="gray">
-                    Top {comparisonData.percentile}% of companies
-                  </Text>
-                </Flex>
-              </Card>
-
-              {/* Companies List */}
-              <Box mb="4">
-                <Text size="4" weight="bold" mb="3">All Companies (Ranked)</Text>
-                {currentCompanies?.map((company, index) => (
-                  <Card 
-                    key={company.name}
-                    style={{
-                      backgroundColor: 
-                        indexOfFirstCompany + index < 3 
-                          ? 'var(--accent-2)' 
-                          : 'var(--gray-2)',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    <Flex justify="between" align="center">
-                      <Flex direction="column" gap="1">
-                        <Flex gap="2" align="center">
-                          <Text weight="bold">
-                            #{indexOfFirstCompany + index + 1} {company.name}
-                          </Text>
-                          {indexOfFirstCompany + index < 3 && (
-                            <Badge color="gold" variant="soft">
-                              Top {indexOfFirstCompany + index + 1}
-                            </Badge>
-                          )}
-                        </Flex>
-                        <Text size="2" color="gray">Industry: {company.industry}</Text>
-                      </Flex>
-                      <Flex direction="column" align="end" gap="1">
-                        <Text weight="bold">Score: {company.totalScore}</Text>
-                        <Flex gap="1">
-                          <Badge color={getGradeColor(company.environmentGrade)}>
-                            E: {company.environmentGrade}
-                          </Badge>
-                          <Badge color={getGradeColor(company.socialGrade)}>
-                            S: {company.socialGrade}
-                          </Badge>
-                          <Badge color={getGradeColor(company.governanceGrade)}>
-                            G: {company.governanceGrade}
-                          </Badge>
-                        </Flex>
-                      </Flex>
-                    </Flex>
-                  </Card>
-                ))}
-              </Box>
-
-              {/* Pagination Controls */}
-              <Flex gap="2" justify="center" align="center" mt="4">
-                <Button 
-                  variant="soft" 
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeftIcon />
-                </Button>
-                <Text>
-                  Page {currentPage} of {totalPages}
-                </Text>
-                <Button 
-                  variant="soft" 
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRightIcon />
-                </Button>
-              </Flex>
-            </ScrollArea>
-          </Box>
-        )}
+        {showComparison && renderComparisonSection()}
 
         {/* Updated Ant Design Modal */}
         <Modal
