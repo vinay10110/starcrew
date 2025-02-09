@@ -1,13 +1,13 @@
 /* eslint-disable no-unused-vars */
 import { Container, Heading, Text, Button, Flex, Theme, Box } from '@radix-ui/themes'
-import { Modal, Input, Form, Select, message, Spin } from 'antd'
+import { Modal, Input, Form, Select, message } from 'antd'
 import { UserOutlined, LockOutlined, GoogleOutlined, MailOutlined } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
 import { MoonIcon, SunIcon, UploadIcon } from '@radix-ui/react-icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import ESGFileConverter from '../components/fileConverter'
 import { supabase } from '../components/supabaseClient'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import styled from '@emotion/styled'
 
 // Styled components for the modals
@@ -231,41 +231,6 @@ const HeaderButtons = styled.div`
   }
 `;
 
-const LoadingOverlay = styled(motion.div)`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-`;
-
-const LoadingContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  color: white;
-  text-align: center;
-`;
-
-const LoadingText = styled(motion.div)`
-  font-size: 1.5rem;
-  font-weight: 500;
-  margin-top: 20px;
-`;
-
-const LoadingSpinner = styled(Spin)`
-  .ant-spin-dot-item {
-    background-color: white;
-  }
-`;
-
 const LandingPage = () => {
     const [file, setFile] = useState(null)
     const [isDragging, setIsDragging] = useState(false)
@@ -277,6 +242,9 @@ const LandingPage = () => {
     const [isSignUpOpen, setIsSignUpOpen] = useState(false)
     const [form] = Form.useForm()
     const [user, setUser] = useState(null)
+    const [hasRedirected, setHasRedirected] = useState(false)
+    const location = useLocation();
+    const skipRedirect = location.state?.skipRedirect;
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -323,41 +291,42 @@ const LandingPage = () => {
     }
 
     const handleAnalyzeReport = async () => {
-        if (!user) {
-            message.warning("Please sign in to analyze reports")
-            setIsSignInOpen(true)
-            return
+        if (!user?.email) {
+            message.warning("Please sign in to analyze reports");
+            setIsSignInOpen(true);
+            return;
         }
 
-        if (!file) return
+        if (!file) return;
 
-        setIsProcessing(true)
-        setError(null)
+        setIsProcessing(true);
+        setError(null);
 
         try {
-            // Add a minimum loading time for better UX
-            await Promise.all([
-                ESGFileConverter.convertFile(file),
-                new Promise(resolve => setTimeout(resolve, 2000)) // Minimum 2s loading
-            ]).then(([result]) => {
-                if (result.success) {
-                    navigate('/dashboard', { 
-                        state: { 
-                            data: result.data,
-                            fileName: file.name 
-                        } 
-                    })
+            const result = await ESGFileConverter.convertFile(file, user.email);
+            
+            if (result.success) {
+                if (result.isNewUpload) {
+                    message.success('File processed and saved successfully');
                 } else {
-                    setError(result.error || 'Failed to process file')
+                    message.info('This file has already been processed');
                 }
-            })
+                navigate('/dashboard', { 
+                    state: { 
+                        data: result.data,
+                        fileName: file.name 
+                    } 
+                });
+            } else {
+                setError(result.error || 'Failed to process file');
+            }
         } catch (error) {
-            console.error('Error processing file:', error)
-            setError('Failed to process file. Please ensure it contains valid ESG data.')
+            console.error('Error processing file:', error);
+            setError('Failed to process file. Please ensure it contains valid ESG data.');
         } finally {
-            setIsProcessing(false)
+            setIsProcessing(false);
         }
-    }
+    };
 
     const handleGoogleSignIn = async () => {
         try {
@@ -372,58 +341,68 @@ const LandingPage = () => {
                 }
             })
 
-            if (error) throw error
+            if (error) {
+                throw error
+            }
 
             // No need to manually navigate - OAuth redirect will handle this
             setIsSignInOpen(false)
             setIsSignUpOpen(false)
         } catch (error) {
             console.error('Error signing in with Google:', error)
-            message.error('Failed to sign in with Google. Please try again.')
+            Modal.error({
+                title: 'Google Sign In Failed',
+                content: 'Failed to sign in with Google. Please try again.'
+            })
         }
     }
 
     const handleEmailSignIn = async (values) => {
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                 email: values.email,
                 password: values.password,
             });
             
-            if (error) {
-                if (error.message === 'Email not confirmed') {
-                    Modal.warning({
-                        title: 'Email Not Verified',
-                        content: 'Please check your email and click the verification link to activate your account. Need a new link?',
-                        okText: 'Resend Link',
-                        onOk: async () => {
-                            try {
-                                const { error } = await supabase.auth.resend({
-                                    type: 'signup',
-                                    email: values.email,
-                                    options: {
-                                        emailRedirectTo: `${window.location.origin}/dashboard`
-                                    }
-                                });
-                                if (error) throw error;
-                                message.success('Verification email resent! Please check your inbox.');
-                            } catch (resendError) {
-                                message.error('Failed to resend verification email. Please try again.');
-                            }
-                        }
+            if (authError) throw authError;
+
+            // Fetch existing reports after successful sign in
+            const { data: existingReports, error: fetchError } = await supabase
+                .from('reports')
+                .select('*')
+                .eq('email', values.email)
+                .order('created_at', { ascending: false });
+
+            if (fetchError) {
+                console.error('Error fetching reports:', fetchError);
+                message.warning('Signed in successfully but failed to fetch existing reports');
+            } else {
+                console.log('Fetched existing reports:', existingReports);
+                if (existingReports?.length > 0 && !hasRedirected) {
+                    message.info(`Found ${existingReports.length} existing report(s)`);
+                    const mostRecentReport = existingReports[0]; // Already sorted by created_at
+                    
+                    setIsSignInOpen(false);
+                    form.resetFields();
+                    setHasRedirected(true);
+                    message.success('Successfully signed in!');
+                    navigate('/dashboard', { 
+                        state: { 
+                            data: mostRecentReport.data,
+                            existingReports: existingReports,
+                            fileName: mostRecentReport.filename
+                        } 
                     });
                     return;
                 }
-                throw error;
             }
             
             setIsSignInOpen(false);
             form.resetFields();
             message.success('Successfully signed in!');
-            navigate('/dashboard');
         } catch (error) {
             console.error('Error signing in:', error);
-            message.error(error.message || 'Invalid email or password');
+            message.error('Invalid email or password');
         }
     };
 
@@ -448,7 +427,7 @@ const LandingPage = () => {
             })
         } catch (error) {
             console.error('Error signing up:', error)
-            message.error(error.message || 'Failed to sign up. Please try again.')
+            setError('Failed to sign up. Please try again.')
         }
     }
 
@@ -457,10 +436,9 @@ const LandingPage = () => {
             const { error } = await supabase.auth.signOut()
             if (error) throw error
             setUser(null)
-            message.success('Successfully signed out!')
         } catch (error) {
             console.error('Error signing out:', error)
-            message.error('Failed to sign out. Please try again.')
+            setError('Failed to sign out. Please try again.')
         }
     }
 
@@ -485,6 +463,54 @@ const LandingPage = () => {
         }
         setIsSignUpOpen(true);
     }
+
+    // Add a new function to fetch reports
+    const fetchUserReports = async (email) => {
+        try {
+            const { data: reports, error } = await supabase
+                .from('reports')
+                .select('*')
+                .eq('email', email)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            return reports;
+        } catch (error) {
+            console.error('Error fetching user reports:', error);
+            message.error('Failed to fetch existing reports');
+            return [];
+        }
+    };
+
+    // Update useEffect to respect skipRedirect flag
+    useEffect(() => {
+        if (user?.email && !hasRedirected && !skipRedirect) {
+            fetchUserReports(user.email).then(reports => {
+                if (reports?.length > 0) {
+                    console.log('Found existing reports:', reports);
+                    message.info(`Found ${reports.length} existing report(s)`);
+                    const mostRecentReport = reports[0]; // Already sorted by created_at
+                    
+                    setHasRedirected(true);
+                    navigate('/dashboard', { 
+                        state: { 
+                            data: mostRecentReport.data,
+                            existingReports: reports,
+                            fileName: mostRecentReport.filename
+                        } 
+                    });
+                }
+            });
+        }
+    }, [user, navigate, hasRedirected, skipRedirect]); // Added skipRedirect to dependencies
+
+    // Reset redirect flag when component unmounts or user signs out
+    useEffect(() => {
+        if (!user) {
+            setHasRedirected(false);
+        }
+    }, [user]);
 
     return (
         <Theme appearance={isDarkMode ? 'dark' : 'light'}>
@@ -546,10 +572,7 @@ const LandingPage = () => {
                         </Heading>
                     }
                     open={isSignInOpen}
-                    onCancel={() => {
-                        setIsSignInOpen(false);
-                        form.resetFields();
-                    }}
+                    onCancel={() => setIsSignInOpen(false)}
                     footer={null}
                     width={window.innerWidth > 480 ? 400 : '95%'}
                 >
@@ -627,10 +650,7 @@ const LandingPage = () => {
                         </Heading>
                     }
                     open={isSignUpOpen}
-                    onCancel={() => {
-                        setIsSignUpOpen(false);
-                        form.resetFields();
-                    }}
+                    onCancel={() => setIsSignUpOpen(false)}
                     footer={null}
                     width={window.innerWidth > 480 ? 400 : '95%'}
                 >
@@ -691,7 +711,6 @@ const LandingPage = () => {
                                     onClick={() => {
                                         setIsSignUpOpen(false);
                                         setIsSignInOpen(true);
-                                        form.resetFields();
                                     }}
                                 >
                                     Sign in
@@ -863,23 +882,15 @@ const LandingPage = () => {
                             )}
 
                             {isProcessing && (
-                                <LoadingOverlay
+                                <motion.div
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
                                     transition={{ duration: 0.3 }}
                                 >
-                                    <LoadingContent>
-                                        <LoadingSpinner size="large" />
-                                        <LoadingText
-                                            initial={{ opacity: 0, y: 20 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.2 }}
-                                        >
-                                            Analyzing ESG Report...
-                                        </LoadingText>
-                                    </LoadingContent>
-                                </LoadingOverlay>
+                                    <Text size="2" color="gray" align="center" style={{ marginTop: '12px' }}>
+                                        Processing your file...
+                                    </Text>
+                                </motion.div>
                             )}
 
                             {file && !isProcessing && user && (

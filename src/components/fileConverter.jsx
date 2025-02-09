@@ -2,39 +2,99 @@
 import * as XLSX from 'xlsx';
 import useESGStore from '../store/useESGStore'; // Import the Zustand store
 import { calculateESGScore } from './scoreCalculator';
+import { supabase } from './supabaseClient';
 
 class ESGFileConverter {
-  static async convertFile(file) {
+  static async convertFile(file, userEmail) {
     try {
-      if (!file) {
-        throw new Error('No file provided');
+      if (!file || !userEmail) {
+        throw new Error('No file or user email provided');
       }
 
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      let rawData;
+      let jsonContent;
+
       if (fileExtension !== 'json') {
-        throw new Error('Only JSON files are supported');
+        throw new Error('Please upload a JSON file');
       }
 
-      // Read and parse JSON file
-      const fileContent = await this.readFile(file);
-      const rawData = JSON.parse(fileContent);
+      console.log('JSON file detected, starting processing...');
+      jsonContent = await this.readFile(file);
+      try {
+        rawData = JSON.parse(jsonContent);
+        console.log('Parsed JSON data:', rawData);
+      } catch (error) {
+        console.error('JSON parsing error:', error);
+        throw new Error('Invalid JSON format');
+      }
 
-      // Transform into standard ESG structure
-      const convertedData = this.convertToESGFormat(rawData);
+      // Convert to standard ESG format
+      console.log('Converting to standard ESG format...');
+      const standardizedData = this.convertToESGFormat(rawData);
+      console.log('Final standardized data:', standardizedData);
 
-      // Update the Zustand store
-      const { setESGData } = useESGStore.getState();
-      setESGData(convertedData);
+      try {
+        // Check if data already exists in Supabase
+        console.log('Checking for existing data with:', { userEmail, fileName: file.name });
+        const { data: existingData, error: fetchError } = await supabase
+          .from('reports')
+          .select('*')
+          .eq('email', userEmail)
+          .eq('filename', file.name);
 
-      return {
-        success: true,
-        data: convertedData
-      };
+        if (fetchError) {
+          console.error('Fetch error details:', fetchError);
+          throw new Error(`Failed to check existing data: ${fetchError.message}`);
+        }
+
+        console.log('Existing data check result:', existingData);
+
+        // If data doesn't exist, save it
+        if (!existingData || existingData.length === 0) {
+          console.log('Attempting to insert new data');
+          const insertData = {
+            email: userEmail,
+            filename: file.name,
+            data: standardizedData,
+            created_at: new Date().toISOString()
+          };
+          console.log('Insert payload:', insertData);
+
+          const { data: insertedData, error: uploadError } = await supabase
+            .from('reports')
+            .insert([insertData])
+            .select();
+
+          if (uploadError) {
+            console.error('Upload error details:', uploadError);
+            throw new Error(`Failed to save data: ${uploadError.message}`);
+          }
+
+          console.log('Data saved successfully:', insertedData);
+          return {
+            success: true,
+            data: standardizedData,
+            isNewUpload: true
+          };
+        } else {
+          console.log('Using existing data:', existingData[0]);
+          return {
+            success: true,
+            data: existingData[0].data,
+            isNewUpload: false
+          };
+        }
+      } catch (dbError) {
+        console.error('Database operation details:', dbError);
+        throw new Error(`Database operation failed: ${dbError.message}`);
+      }
 
     } catch (error) {
+      console.error('Final error details:', error);
       return {
         success: false,
-        error: `Conversion failed: ${error.message}`
+        error: error.message
       };
     }
   }
@@ -46,6 +106,119 @@ class ESGFileConverter {
       reader.onerror = (e) => reject(e);
       reader.readAsText(file);
     });
+  }
+
+  static async csvToJson(file) {
+    try {
+      console.log('Starting CSV data reading...');
+      
+      // Read the CSV file
+      const csvContent = await this.readFile(file);
+      
+      // Split into lines and remove empty lines
+      const lines = csvContent.split('\n').filter(line => line.trim());
+      
+      // Get headers from first line
+      const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
+      console.log('CSV Headers found:', headers);
+
+      // Log all data in a table format
+      console.log('=== CSV Raw Data ===');
+      lines.forEach(line => {
+        console.log(line);
+      });
+      console.log('===================');
+
+      // Return raw data for inspection
+      return {
+        headers: headers,
+        rows: lines.slice(1).map(line => line.split(',').map(item => item.trim()))
+      };
+
+    } catch (error) {
+      console.error('CSV reading error:', error);
+      throw new Error(`CSV reading failed: ${error.message}`);
+    }
+  }
+
+  static async excelToJson(file) {
+    try {
+      console.log('Starting Excel data reading...');
+
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          try {
+            console.log('Excel file read, starting parsing...');
+            const workbook = XLSX.read(e.target.result, { type: 'binary' });
+            const firstSheetName = workbook.SheetNames[0];
+            console.log('Processing sheet:', firstSheetName);
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Get the raw data first
+            const rawData = XLSX.utils.sheet_to_json(worksheet, { 
+              header: 1,
+              raw: false,
+              defval: ''
+            });
+
+            // Log raw data
+            console.log('=== Excel Raw Data ===');
+            rawData.forEach(row => {
+              console.log(row.join(', '));
+            });
+            console.log('===================');
+
+            // Convert to JSON
+            const headers = rawData[0].map(h => h?.toLowerCase() || '');
+            const jsonData = rawData.slice(1).map(row => {
+              const rowData = {};
+              headers.forEach((header, index) => {
+                if (header) { // only process if header exists
+                  const value = row[index];
+                  // Convert to number if possible
+                  rowData[header] = isNaN(value) ? value : Number(value);
+                }
+              });
+              return rowData;
+            });
+
+            // Log JSON data
+            console.log('=== Converted JSON Data ===');
+            console.log('Headers:', headers);
+            console.log('Number of records:', jsonData.length);
+            console.log('Full JSON data:', JSON.stringify(jsonData, null, 2));
+            if (jsonData.length > 0) {
+              console.log('Sample record:', jsonData[0]);
+            }
+            console.log('=========================');
+
+            resolve({
+              headers: headers,
+              rows: jsonData
+            });
+
+          } catch (error) {
+            console.error('Excel parsing error:', error);
+            reject(error);
+          }
+        };
+        
+        reader.onerror = (error) => {
+          console.error('File reading error:', error);
+          reject(error);
+        };
+        
+        reader.readAsBinaryString(file);
+      });
+
+      return data;
+
+    } catch (error) {
+      console.error('Excel reading error:', error);
+      throw new Error(`Excel reading failed: ${error.message}`);
+    }
   }
 
   static convertToESGFormat(data) {
