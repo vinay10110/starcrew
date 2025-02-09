@@ -23,7 +23,7 @@ import html2canvas from 'html2canvas'
 import emailjs from 'emailjs-com'
 import Highcharts from 'highcharts'
 
-import { Document, Packer, Paragraph, ImageRun, HeadingLevel, AlignmentType, PageBreak } from 'docx'
+import { Document, Packer, Paragraph, ImageRun, HeadingLevel, AlignmentType, PageBreak, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
 
 // Import Ant Design CSS
@@ -45,6 +45,10 @@ const Dashboard = () => {
   const [openDialog, setOpenDialog] = React.useState(false)
   const [generatedFile, setGeneratedFile] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  // Add separate loading states for each button
+  const [isEmailSending, setIsEmailSending] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Add this function to calculate total score
   const calculateTotalScore = (data) => {
@@ -149,78 +153,174 @@ const Dashboard = () => {
   };
 
   const handleGenerateReport = async () => {
-    let file
-    if (exportFormat === 'pdf') {
-        file = await generatePDF()
-    } else {
-        file = await generateWord()
+    try {
+      setIsLoading(true);
+      const charts = await captureCharts();
+
+      // Create PowerPoint presentation
+      const pptx = new pptxgen();
+
+      // Title Slide
+      const titleSlide = pptx.addSlide();
+      titleSlide.addText("ESG Performance Analysis", {
+        x: 0.5,
+        y: 1.5,
+        w: '90%',
+        h: 1.5,
+        fontSize: 44,
+        color: '363636',
+        bold: true,
+        align: 'center'
+      });
+
+      titleSlide.addText(`Generated on ${new Date().toLocaleDateString()}`, {
+        x: 0.5,
+        y: 3.5,
+        fontSize: 20,
+        color: '666666',
+        align: 'center'
+      });
+
+      // Scores Overview Slide
+      const scoresSlide = pptx.addSlide();
+      scoresSlide.addText("ESG Scores Overview", {
+        x: 0.5,
+        y: 0.5,
+        fontSize: 32,
+        color: '363636',
+        bold: true
+      });
+
+      const scoreData = [
+        ["Category", "Score", "Grade", "Level"],
+        ["Environmental", data.scores.environment_score, data.scores.environment_grade, data.scores.environment_level],
+        ["Social", data.scores.social_score, data.scores.social_grade, data.scores.social_level],
+        ["Governance", data.scores.governance_score, data.scores.governance_grade, data.scores.governance_level],
+        ["Total", data.scores.total_score, data.scores.total_grade, data.scores.total_level]
+      ];
+
+      scoresSlide.addTable(scoreData, {
+        x: 0.5,
+        y: 1.5,
+        w: 9,
+        colW: [2.5, 2, 2, 2.5],
+        fontSize: 16,
+        border: { pt: 1, color: "666666" },
+        align: "center"
+      });
+
+      // Add chart slides
+      for (const chart of charts) {
+        const slide = pptx.addSlide();
+        
+        // Add title
+        slide.addText(chart.title, {
+          x: 0.5,
+          y: 0.5,
+          fontSize: 24,
+          color: '363636',
+          bold: true
+        });
+
+        // Add chart image
+        slide.addImage({
+          data: chart.imageData,
+          x: 0.5,
+          y: 1.2,
+          w: 9,
+          h: 4.5
+        });
+
+        // Add analysis text
+        slide.addText(getAnalysisText(chart.title, data), {
+          x: 0.5,
+          y: 6,
+          w: 9,
+          fontSize: 14,
+          color: '666666',
+          bullet: true
+        });
+      }
+
+      // Recommendations Slide
+      const recomSlide = pptx.addSlide();
+      recomSlide.addText("Key Recommendations", {
+        x: 0.5,
+        y: 0.5,
+        fontSize: 32,
+        color: '363636',
+        bold: true
+      });
+
+      const recommendations = getRecommendations(data);
+      recomSlide.addText(recommendations, {
+        x: 0.5,
+        y: 1.5,
+        w: 9,
+        fontSize: 16,
+        color: '666666',
+        bullet: true,
+        lineSpacing: 40
+      });
+
+      // Save or email the presentation
+      if (emailAddress) {
+        const pptxBuffer = await pptx.write('base64');
+        await sendEmail(emailAddress, pptxBuffer);
+        message.success('Report sent successfully to ' + emailAddress);
+      } else {
+        await pptx.writeFile('ESG_Performance_Report.pptx');
+        message.success('Report downloaded successfully');
+      }
+
+    } catch (error) {
+      console.error('Error generating report:', error);
+      message.error('Failed to generate report: ' + error.message);
+    } finally {
+      setIsLoading(false);
+      setIsDialogOpen(false);
     }
-    setGeneratedFile(file)
-  }
+  };
 
   const handleDirectDownload = async () => {
     try {
-        setIsLoading(true);
-
-        // Get chart containers
-        const chartContainers = {
-            environmental: document.getElementById('environmental-section'),
-            social: document.getElementById('social-section'),
-            governance: document.getElementById('governance-section')
-        };
-
-        if (!chartContainers.environmental || !chartContainers.social || !chartContainers.governance) {
-            throw new Error('Could not find chart containers');
-        }
-
-        // Wait for charts to be fully rendered
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Generate and download file
-        let file;
-        if (exportFormat === 'pdf') {
-            file = await generatePDF(chartContainers);
-        } else {
-            file = await generateWord(chartContainers);
-        }
-
-        const fileName = `ESG_Report_${new Date().toISOString().split('T')[0]}.${exportFormat}`;
-        saveAs(file, fileName);
-
+      setIsDownloading(true);
+      const file = await generateWord();
+      const fileName = `ESG_Report.docx`;
+      saveAs(file, fileName);
+      message.success("Report downloaded successfully!");
     } catch (error) {
-        console.error('Error during download:', error);
+      console.error("Failed to generate report:", error);
+      message.error("Failed to generate report. Please try again.");
     } finally {
-        setIsLoading(false);
+      setIsDownloading(false);
     }
   };
 
   const captureCharts = async () => {
-    const charts = [];
-    
-    // Get all Highcharts instances
-    if (Highcharts.charts) {
-      Highcharts.charts.forEach(chart => {
-        if (chart) {
-          try {
-            // Export chart as PNG with optimized settings
-            const imageData = chart.toDataURL({
-              format: 'png',
-              width: 800,
-              scale: 1
-            });
-            
-            charts.push({
-              title: chart.title ? chart.title.textStr : 'Chart',
-              imageData: imageData
-            });
-          } catch (error) {
-            console.error('Error capturing chart:', error);
-          }
-        }
-      });
+    const chartElements = document.querySelectorAll('.highcharts-container');
+    const chartData = [];
+
+    for (const element of chartElements) {
+      try {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          backgroundColor: null,
+          logging: false
+        });
+        
+        const title = element.closest('.rt-Card')?.querySelector('.rt-Heading')?.textContent || 'Chart';
+        
+        chartData.push({
+          title: title,
+          imageData: canvas.toDataURL('image/png')
+        });
+      } catch (error) {
+        console.error('Error capturing chart:', error);
+      }
     }
-    
-    return charts;
+
+    return chartData;
   };
 
   const generatePDF = async () => {
@@ -291,45 +391,82 @@ const Dashboard = () => {
         sections: [{
           properties: {},
           children: [
+            // Title Page
             new Paragraph({
-              text: "ESG Report",
+              text: "ESG Performance Analysis Report",
               heading: HeadingLevel.TITLE,
               spacing: { before: 300, after: 300 },
               alignment: AlignmentType.CENTER
             }),
+            
+            // Executive Summary
             new Paragraph({
-              text: new Date().toLocaleDateString(),
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 800 }
+              text: "Executive Summary",
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 200, after: 100 }
+            }),
+            new Paragraph({
+              text: `This report provides a comprehensive analysis of the organization's Environmental, Social, and Governance (ESG) performance. The analysis covers key metrics across all three ESG dimensions, with detailed breakdowns of energy consumption, emissions, workforce diversity, and governance structures.`,
+              spacing: { after: 200 }
+            }),
+
+            // Scores Overview
+            new Paragraph({
+              text: "ESG Scores Overview",
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 200, after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `Environmental Score: ${data.scores.environment_score} (Grade ${data.scores.environment_grade})\n`,
+                  bold: true
+                }),
+                new TextRun({
+                  text: `Social Score: ${data.scores.social_score} (Grade ${data.scores.social_grade})\n`,
+                  bold: true
+                }),
+                new TextRun({
+                  text: `Governance Score: ${data.scores.governance_score} (Grade ${data.scores.governance_grade})\n`,
+                  bold: true
+                }),
+                new TextRun({
+                  text: `Overall ESG Score: ${data.scores.total_score} (Grade ${data.scores.total_grade})`,
+                  bold: true
+                })
+              ],
+              spacing: { after: 200 }
             })
           ]
         }]
       });
 
-      // Add each chart
+      // Add sections for each chart with analysis
       for (const chart of charts) {
         try {
-          const binaryString = window.atob(chart.imageData.split(',')[1]);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-
+          // Add section heading
           doc.addSection({
-            properties: {},
             children: [
               new Paragraph({
                 text: chart.title,
-                heading: HeadingLevel.HEADING_1,
-                spacing: { before: 200, after: 200 }
+                heading: HeadingLevel.HEADING_2,
+                spacing: { before: 200, after: 100 }
               }),
+              
+              // Add analysis text based on chart type
+              new Paragraph({
+                text: getChartAnalysis(chart.title, data),
+                spacing: { before: 100, after: 100 }
+              }),
+              
+              // Add chart image
               new Paragraph({
                 children: [
                   new ImageRun({
-                    data: bytes,
+                    data: chart.imageData,
                     transformation: {
-                      width: 500,
-                      height: 300
+                      width: 600,
+                      height: 400
                     }
                   })
                 ],
@@ -338,15 +475,77 @@ const Dashboard = () => {
             ]
           });
         } catch (error) {
-          console.error('Error adding chart to Word document:', error);
+          console.error('Error adding chart section:', error);
         }
       }
+
+      // Add recommendations section
+      doc.addSection({
+        children: [
+          new Paragraph({
+            text: "Recommendations",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 200, after: 100 }
+          }),
+          new Paragraph({
+            text: generateRecommendations(data),
+            spacing: { after: 200 }
+          })
+        ]
+      });
 
       return await Packer.toBlob(doc);
     } catch (error) {
       console.error('Error generating Word document:', error);
       throw error;
     }
+  };
+
+  // Helper function to generate analysis text for each chart
+  const getChartAnalysis = (chartTitle, data) => {
+    switch (chartTitle) {
+      case 'Indirect Energy Consumption':
+        return `Analysis of indirect energy consumption shows ${getEnergyTrend(data.environmental.energy.breakdown.indirect)}. This indicates ${getEnergyImplication(data.environmental.energy.breakdown.indirect)}.`;
+      
+      case 'Renewable Energy Sources':
+        return `The organization's renewable energy adoption ${getRenewablesTrend(data.environmental.energy.breakdown.renewable)}. This demonstrates ${getRenewablesImplication(data.environmental.energy.breakdown.renewable)}.`;
+      
+      case 'Emissions by Scope':
+        return `Carbon emissions across all scopes show ${getEmissionsTrend(data.environmental.emissions)}. Key areas for improvement include ${getEmissionsRecommendation(data.environmental.emissions)}.`;
+      
+      // Add more cases for other chart types
+      
+      default:
+        return 'Detailed analysis of the metrics shows important trends in ESG performance.';
+    }
+  };
+
+  // Helper function to generate recommendations
+  const generateRecommendations = (data) => {
+    const recommendations = [];
+    
+    // Environmental recommendations
+    if (data.scores.environment_score < 400) {
+      recommendations.push("• Implement more aggressive energy efficiency measures");
+      recommendations.push("• Increase renewable energy adoption");
+      recommendations.push("• Develop comprehensive emissions reduction strategy");
+    }
+    
+    // Social recommendations
+    if (data.scores.social_score < 400) {
+      recommendations.push("• Enhance diversity and inclusion programs");
+      recommendations.push("• Strengthen employee development initiatives");
+      recommendations.push("• Improve workplace safety measures");
+    }
+    
+    // Governance recommendations
+    if (data.scores.governance_score < 400) {
+      recommendations.push("• Strengthen board independence");
+      recommendations.push("• Enhance transparency in reporting");
+      recommendations.push("• Implement stronger risk management frameworks");
+    }
+    
+    return recommendations.join("\n");
   };
 
   const handleSendReport = async () => {
@@ -356,8 +555,8 @@ const Dashboard = () => {
     }
 
     try {
-      setIsLoading(true);
-      const file = exportFormat === 'pdf' ? await generatePDF() : await generateWord();
+      setIsEmailSending(true);
+      const file = await generateWord();
 
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -369,7 +568,7 @@ const Dashboard = () => {
             to_email: emailAddress,
             message: `ESG Report generated on ${new Date().toLocaleDateString()}`,
             attachment: base64data,
-            filename: `ESG_Report.${exportFormat}`
+            filename: `ESG_Report.docx`
           };
 
           await emailjs.send(
@@ -394,7 +593,7 @@ const Dashboard = () => {
       console.error("Failed to generate report:", error);
       message.error("Failed to generate report. Please try again.");
     } finally {
-      setIsLoading(false);
+      setIsEmailSending(false);
     }
   };
 
@@ -403,6 +602,64 @@ const Dashboard = () => {
       state: { data: esgData }, // Pass the current data
       replace: false // Don't replace the history entry
     });
+  };
+
+  // Helper function for analysis text
+  const getAnalysisText = (chartTitle, data) => {
+    const analysis = [];
+    
+    switch (chartTitle) {
+      case 'Environmental Metrics':
+        analysis.push(`Total energy consumption shows ${getTrend(data.environmental?.energy?.total)} trend`);
+        analysis.push(`Emissions performance is ${getEmissionsStatus(data.environmental?.emissions)}`);
+        analysis.push(`Resource utilization efficiency is ${getResourceEfficiency(data.environmental)}`);
+        break;
+
+      case 'Social Metrics':
+        analysis.push(`Employee diversity metrics indicate ${getDiversityStatus(data.social)}`);
+        analysis.push(`Workforce development shows ${getWorkforceStatus(data.social)}`);
+        analysis.push(`Community engagement level is ${getCommunityStatus(data.social)}`);
+        break;
+
+      case 'Governance Metrics':
+        analysis.push(`Board composition reflects ${getBoardStatus(data.governance)}`);
+        analysis.push(`Corporate policies demonstrate ${getPolicyStatus(data.governance)}`);
+        analysis.push(`Risk management framework is ${getRiskStatus(data.governance)}`);
+        break;
+
+      default:
+        analysis.push('Detailed analysis of metrics shows important trends in ESG performance');
+    }
+
+    return analysis;
+  };
+
+  // Helper function for recommendations
+  const getRecommendations = (data) => {
+    const recommendations = [];
+
+    // Environmental recommendations
+    if (data.scores.environment_score < 500) {
+      recommendations.push("Implement energy efficiency initiatives");
+      recommendations.push("Increase renewable energy adoption");
+      recommendations.push("Develop comprehensive emissions reduction strategy");
+    }
+
+    // Social recommendations
+    if (data.scores.social_score < 500) {
+      recommendations.push("Enhance diversity and inclusion programs");
+      recommendations.push("Strengthen employee development initiatives");
+      recommendations.push("Improve workplace safety measures");
+    }
+
+    // Governance recommendations
+    if (data.scores.governance_score < 500) {
+      recommendations.push("Strengthen board independence");
+      recommendations.push("Enhance transparency in reporting");
+      recommendations.push("Implement stronger risk management frameworks");
+    }
+
+    return recommendations;
   };
 
   return (
@@ -606,9 +863,9 @@ const Dashboard = () => {
           }
           open={openDialog}
           onCancel={() => {
-            if (!isLoading) {
-                setOpenDialog(false)
-                setGeneratedFile(null)
+            if (!isEmailSending && !isDownloading) {
+              setOpenDialog(false)
+              setGeneratedFile(null)
             }
           }}
           footer={
@@ -621,20 +878,20 @@ const Dashboard = () => {
               <Button 
                 key="cancel"
                 onClick={() => {
-                    if (!isLoading) {
-                        setOpenDialog(false)
-                        setGeneratedFile(null)
-                    }
+                  if (!isEmailSending && !isDownloading) {
+                    setOpenDialog(false)
+                    setGeneratedFile(null)
+                  }
                 }}
-                disabled={isLoading}
+                disabled={isEmailSending || isDownloading}
                 style={{
                   backgroundColor: '#f0f0f0',
-                  color: isLoading ? '#999999' : '#000000',
+                  color: (isEmailSending || isDownloading) ? '#999999' : '#000000',
                   padding: '0 20px',
                   height: '36px',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  cursor: (isEmailSending || isDownloading) ? 'not-allowed' : 'pointer',
                   transition: 'background-color 0.2s'
                 }}
               >
@@ -643,62 +900,62 @@ const Dashboard = () => {
               <Button
                 key="send"
                 onClick={handleSendReport}
-                disabled={isLoading}
+                disabled={isEmailSending || isDownloading}
                 style={{
-                  backgroundColor: isLoading ? '#4b5563' : '#2563eb',
+                  backgroundColor: isEmailSending ? '#4b5563' : '#2563eb',
                   color: '#ffffff',
                   padding: '0 20px',
                   height: '36px',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  cursor: isEmailSending ? 'not-allowed' : 'pointer',
                   transition: 'background-color 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px'
                 }}
               >
-                {isLoading ? (
-                    <>
-                        <span className="loading-spinner"></span>
-                        Processing...
-                    </>
+                {isEmailSending ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Sending...
+                  </>
                 ) : (
-                    'Send Report'
+                  'Send Report'
                 )}
               </Button>
               <Button
                 key="download"
                 onClick={handleDirectDownload}
-                disabled={isLoading}
+                disabled={isEmailSending || isDownloading}
                 style={{
-                  backgroundColor: isLoading ? '#4b5563' : '#2563eb',
+                  backgroundColor: isDownloading ? '#4b5563' : '#2563eb',
                   color: '#ffffff',
                   padding: '0 20px',
                   height: '36px',
                   border: 'none',
                   borderRadius: '6px',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  cursor: isDownloading ? 'not-allowed' : 'pointer',
                   transition: 'background-color 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px'
                 }}
               >
-                {isLoading ? (
-                    <>
-                        <span className="loading-spinner"></span>
-                        Processing...
-                    </>
+                {isDownloading ? (
+                  <>
+                    <span className="loading-spinner"></span>
+                    Downloading...
+                  </>
                 ) : (
-                    `Download ${exportFormat.toUpperCase()}`
+                  'Download Report'
                 )}
               </Button>
             </div>
           }
           width={500}
-          closable={!isLoading}
-          maskClosable={!isLoading}
+          closable={!isEmailSending && !isDownloading}
+          maskClosable={!isEmailSending && !isDownloading}
           style={{
             top: 20
           }}
@@ -728,7 +985,7 @@ const Dashboard = () => {
                   { value: 'pdf', label: 'PDF' },
                   { value: 'word', label: 'Word Document' }
                 ]}
-                disabled={isLoading}
+                disabled={isEmailSending || isDownloading}
                 style={{ 
                   width: '100%',
                   height: '36px'
