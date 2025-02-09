@@ -231,6 +231,106 @@ const HeaderButtons = styled.div`
   }
 `;
 
+const styles = {
+  gradientText: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    textFillColor: 'transparent',
+    fontFamily: "'Playfair Display', serif", // Elegant serif font
+    position: 'relative',
+    display: 'inline-block',
+    fontSize: 'clamp(2.5rem, 5vw, 4.5rem)', // Responsive font size
+    fontWeight: '700',
+    letterSpacing: '-0.02em',
+    lineHeight: '1.2',
+    textAlign: 'center',
+    margin: '0 0 20px 0',
+    padding: '0 20px'
+  },
+  subtitle: {
+    fontFamily: "'Cormorant Garamond', serif",
+    fontSize: 'clamp(1.2rem, 2.2vw, 1.8rem)',
+    background: 'linear-gradient(135deg, var(--gray-11) 0%, var(--gray-12) 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    textFillColor: 'transparent',
+    maxWidth: '650px',
+    textAlign: 'center',
+    lineHeight: '1.6',
+    margin: '0 auto',
+    padding: '0 20px',
+    position: 'relative',
+    fontWeight: '500',
+    letterSpacing: '0.03em',
+    fontStyle: 'italic'
+  },
+  typingCursor: {
+    display: 'inline-block',
+    width: '3px',
+    height: '1.2em',
+    background: '#667eea',
+    marginLeft: '4px',
+    verticalAlign: 'middle',
+    animation: 'blink 1s step-end infinite'
+  },
+  '@keyframes blink': {
+    'from, to': { opacity: 1 },
+    '50%': { opacity: 0 }
+  },
+  subtitleContainer: {
+    position: 'relative',
+    padding: '20px 0',
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      left: '0',
+      top: '0',
+      width: '100%',
+      height: '1px',
+      background: 'linear-gradient(90deg, transparent, var(--gray-6), transparent)'
+    },
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      left: '0',
+      bottom: '0',
+      width: '100%',
+      height: '1px',
+      background: 'linear-gradient(90deg, transparent, var(--gray-6), transparent)'
+    }
+  },
+  subtitleAccent: {
+    fontFamily: "'Montserrat', sans-serif",
+    color: '#667eea',
+    fontWeight: '600',
+    fontStyle: 'normal',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    fontSize: '0.9em'
+  },
+  decorativeLine: {
+    position: 'absolute',
+    bottom: '-10px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '100px',
+    height: '3px',
+    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '2px'
+  },
+  decorativeElement: {
+    position: 'absolute',
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    opacity: 0.6
+  }
+};
+
 const LandingPage = () => {
     const [file, setFile] = useState(null)
     const [isDragging, setIsDragging] = useState(false)
@@ -761,29 +861,116 @@ const LandingPage = () => {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.8, delay: 0.3 }}
-                            style={{ marginBottom: '40px', textAlign: 'center' }}
+                            style={{ 
+                                marginBottom: '40px', 
+                                textAlign: 'center',
+                                position: 'relative'
+                            }}
                         >
-                            <Heading 
-                                size="9" 
+                            <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: '100%' }}
+                                transition={{ duration: 1, delay: 1 }}
                                 style={{
-                                    background: 'linear-gradient(to right, var(--accent-9), var(--accent-11))',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    marginBottom: '16px'
+                                    position: 'absolute',
+                                    top: '-20px',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    height: '2px',
+                                    background: 'linear-gradient(90deg, transparent, #667eea, transparent)',
+                                    width: '80px'
                                 }}
+                            />
+                            
+                            <motion.h1 style={styles.gradientText}>
+                                ESG Analytics
+                                <motion.span
+                                    initial={{ width: 0 }}
+                                    animate={{ width: '100px' }}
+                                    transition={{ duration: 1, delay: 0.5 }}
+                                    style={styles.decorativeLine}
+                                />
+                            </motion.h1>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 1.6, delay: 0.6 }}
                             >
-                                ESG Dashboard
-                            </Heading>
-                            <Text 
-                                size="5" 
-                                style={{ 
-                                    maxWidth: '600px',
-                                    color: 'var(--gray-11)',
-                                    lineHeight: '1.4'
-                                }}
-                            >
-                                Transform your ESG data into actionable insights
-                            </Text>
+                                <motion.div
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 0.6 }}
+                                    transition={{ duration: 0.5, delay: 1.2 }}
+                                    style={{
+                                        ...styles.decorativeElement,
+                                        left: '20%',
+                                        top: '0'
+                                    }}
+                                />
+                                <motion.div
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 0.6 }}
+                                    transition={{ duration: 0.5, delay: 1.4 }}
+                                    style={{
+                                        ...styles.decorativeElement,
+                                        right: '20%',
+                                        bottom: '0'
+                                    }}
+                                />
+
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 1.6, delay: 0.6 }}
+                                >
+                                    <Text style={styles.subtitle}>
+                                        <motion.span
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 1.0, delay: 2.0 }}
+                                        >
+                                            Transform your 
+                                        </motion.span>{' '}
+                                        <motion.span
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 1.0, delay: 2.4 }}
+                                            style={styles.subtitleAccent}
+                                        >
+                                            ESG data
+                                        </motion.span>{' '}
+                                        <motion.span
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 1.0, delay: 2.8 }}
+                                        >
+                                            into actionable insights with our
+                                        </motion.span>{' '}
+                                        <motion.span
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 1.0, delay: 3.2 }}
+                                            style={styles.subtitleAccent}
+                                        >
+                                            powerful analytics platform
+                                        </motion.span>
+                                        <motion.span
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 1.0, delay: 3.6 }}
+                                            style={{
+                                                display: 'inline-block',
+                                                width: '3px',
+                                                height: '1.2em',
+                                                background: '#667eea',
+                                                marginLeft: '4px',
+                                                verticalAlign: 'middle',
+                                                animation: 'blink 2s step-end infinite'
+                                            }}
+                                        />
+                                    </Text>
+                                </motion.div>
+                            </motion.div>
                         </motion.div>
 
                         {/* Upload Section */}
@@ -922,6 +1109,14 @@ const LandingPage = () => {
                     </Flex>
                 </Flex>
             </Box>
+            <style>
+                {`
+                    @keyframes blink {
+                        from, to { opacity: 1; }
+                        50% { opacity: 0; }
+                    }
+                `}
+            </style>
         </Theme>
     )
 }

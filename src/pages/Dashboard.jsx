@@ -31,6 +31,27 @@ import { saveAs } from 'file-saver'
 // Import Ant Design CSS
 import 'antd/dist/reset.css'
 
+// Add these color variables at the top of your file
+const darkModeColors = {
+  background: '#0F172A', // Deep blue-gray
+  surface: '#1E293B', // Lighter blue-gray
+  primary: '#38BDF8', // Bright blue
+  secondary: '#818CF8', // Indigo
+  accent: '#F472B6', // Pink
+  text: {
+    primary: '#F1F5F9', // Light gray-blue
+    secondary: '#94A3B8', // Muted blue-gray
+    accent: '#38BDF8' // Bright blue
+  },
+  border: '#334155', // Medium blue-gray
+  hover: '#164E63', // Deep cyan
+  chart: {
+    environmental: '#34D399', // Emerald
+    social: '#818CF8', // Indigo
+    governance: '#F472B6' // Pink
+  }
+};
+
 // Helper functions for trend analysis
 const getEnergyTrend = (data) => {
     if (!data) return 'no data available';
@@ -851,7 +872,7 @@ const Dashboard = () => {
       const file = exportFormat === 'pdf' ? await generatePDF() : await generateWord();
       const fileName = `ESG_Report_${Date.now()}.${exportFormat}`;
 
-      // Upload file using Supabase Storage
+      // Upload file using Supabase Storage REST API
       const { data: uploadData, error: uploadError } = await supabase.storage
           .from('reports')
           .upload(fileName, file, {
@@ -864,34 +885,25 @@ const Dashboard = () => {
           throw new Error('Failed to upload file: ' + uploadError.message);
       }
 
-      // Get public URL - this is the important part
-      const { data } = supabase.storage
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
           .from('reports')
           .getPublicUrl(fileName);
 
-      // Log the URL to verify it's correct
-      console.log('File URL:', data.publicUrl);
-
-      // Send email using EmailJS with the correct URL
+      // Send email using EmailJS
       const templateParams = {
           to_email: emailAddress,
           message: `ESG Report generated on ${new Date().toLocaleDateString()}`,
-          report_link: data.publicUrl, // Use the public URL here
+          report_link: publicUrl,
           format: exportFormat.toUpperCase()
       };
 
-      // Log template params to verify
-      console.log('Email template params:', templateParams);
-
-      const emailResponse = await emailjs.send(
+      await emailjs.send(
           import.meta.env.VITE_EMAILJS_SERVICE_ID,
           import.meta.env.VITE_EMAILJS_TEMPLATE_ID,
           templateParams,
           import.meta.env.VITE_EMAILJS_PUBLIC_KEY
       );
-
-      // Log email response
-      console.log('Email sent successfully:', emailResponse);
 
       message.success("Report sent successfully!");
       setOpenDialog(false);
@@ -970,20 +982,24 @@ const Dashboard = () => {
 
   return (
     <Theme appearance={isDarkMode ? "dark" : "light"}>
-      <Box className="dashboard">
+      <Box style={{ 
+        minHeight: '100vh',
+        background: isDarkMode ? darkModeColors.background : 'var(--gray-1)',
+        color: isDarkMode ? darkModeColors.text.primary : 'inherit'
+      }}>
         <Box
           style={{
-            backgroundColor: 'var(--accent-2)',
+            backgroundColor: isDarkMode ? darkModeColors.surface : 'var(--gray-2)',
             padding: '16px 24px',
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-            borderBottom: '1px solid var(--gray-6)',
+            borderBottom: `1px solid ${isDarkMode ? darkModeColors.border : 'var(--gray-6)'}`,
             position: 'sticky',
             top: 0,
             zIndex: 1000,
           }}
         >
           <Flex justify="between" align="center" wrap="wrap">
-            <Heading size="6" style={{ color: 'var(--accent-9)', flex: '1 1 auto' }}>
+            <Heading size="6" style={{ color: isDarkMode ? darkModeColors.text.primary : 'var(--accent-9)', flex: '1 1 auto' }}>
               ESG Dashboard
             </Heading>
             <Flex gap="4" wrap="wrap" style={{ flex: '1 1 auto', justifyContent: 'flex-end' }}>
