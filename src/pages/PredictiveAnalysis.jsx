@@ -299,8 +299,11 @@ const PredictiveAnalysis = () => {
 
     const handleBack = () => {
         navigate('/dashboard', { 
-            state: { data: esgData },
-            replace: true 
+            state: { 
+                data: esgData,
+                existingReports: location.state?.existingReports,
+                fileName: location.state?.fileName
+            }
         });
     };
 

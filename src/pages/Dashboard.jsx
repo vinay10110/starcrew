@@ -183,7 +183,7 @@ const Dashboard = () => {
   const [showComparison, setShowComparison] = React.useState(false)
   const [comparisonData, setComparisonData] = React.useState({})
   const navigate = useNavigate()
-  const { esgData, calculateScores } = useESGStore()
+  const { esgData, calculateScores, setESGData } = useESGStore()
   const [currentPage, setCurrentPage] = React.useState(1)
   const companiesPerPage = 20
   const [isDialogOpen, setIsDialogOpen] = React.useState(false)
@@ -217,11 +217,13 @@ const Dashboard = () => {
   }
 
   useEffect(() => {
-    if (!data) {
+    if (location.state?.data) {
+      setESGData(location.state.data);
+    } else if (!esgData) {
       console.log('No data found, redirecting to landing page');
       navigate('/', { replace: true });
     }
-  }, [data, navigate]);
+  }, [location.state, navigate, esgData, setESGData]);
 
   useEffect(() => {
     // Initialize EmailJS with your public key
@@ -915,10 +917,13 @@ const Dashboard = () => {
     }
   };
 
-  const handlePredictiveAnalysisClick = () => {
-    navigate('/predictive-analysis', { 
-      state: { data: esgData }, // Pass the current data
-      replace: false // Don't replace the history entry
+  const handlePredictiveAnalysis = () => {
+    navigate('/predictive-analysis', {
+      state: {
+        data: esgData,
+        existingReports: existingReports,
+        fileName: fileName
+      }
     });
   };
 
@@ -1021,7 +1026,7 @@ const Dashboard = () => {
               </Button>
               <Button 
                 type="primary"
-                onClick={handlePredictiveAnalysisClick}
+                onClick={handlePredictiveAnalysis}
                 style={{ display: 'flex', alignItems: 'center' }}
               >
                 <BarChartIcon />
